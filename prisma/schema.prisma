@@ -1,0 +1,349 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String                 @id @default(cuid())
+  name                  String?
+  email                 String                 @unique
+  emailVerified         DateTime?
+  image                 String?
+  passwordHash          String?
+  role                  UserRole               @default(OWNER)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  accounts              Account[]
+  inventoryTransactions InventoryTransaction[]
+  sales                 Sale[]
+  sessions              Session[]
+  stores                Store[]
+}
+
+model Store {
+  id                    String                 @id @default(cuid())
+  name                  String
+  description           String?
+  slug                  String                 @unique
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  ownerId               String
+  categories            Category[]
+  customers             Customer[]
+  inventoryTransactions InventoryTransaction[]
+  products              Product[]
+  sales                 Sale[]
+  owner                 User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  subscription          Subscription?
+  settings              StoreSetting?
+}
+
+model Subscription {
+  id           String             @id @default(cuid())
+  plan         SubscriptionPlan   @default(FREE)
+  status       SubscriptionStatus @default(TRIAL)
+  startsAt     DateTime           @default(now())
+  endsAt       DateTime?
+  trialEndsAt  DateTime?
+  renewalDate  DateTime?
+  billingCycle BillingCycle?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  storeId      String             @unique
+  payments     Payment[]
+  store        Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id             String          @id @default(cuid())
+  amount         Float
+  currency       String          @default("USD")
+  provider       BillingProvider
+  providerRef    String?
+  status         PaymentStatus   @default(PENDING)
+  customerPhone  String?
+  customerEmail  String?
+  errorMessage   String?
+  idempotencyKey String?
+  timeoutAt      DateTime?
+  retryCount     Int             @default(0)
+  metadata       Json?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  subscriptionId String
+  subscription   Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, idempotencyKey])
+}
+
+model StoreSetting {
+  id               String   @id @default(cuid())
+  address          String?
+  phone            String?
+  email            String?
+  currency         String   @default("USD")
+  timezone         String   @default("UTC")
+  dateFormat       String   @default("MM/DD/YYYY")
+  lowStockAlert    Boolean  @default(true)
+  salesNotification Boolean @default(true)
+  emailNotification Boolean @default(true)
+  logoUrl          String?
+  twoFactorEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  storeId          String   @unique
+  store            Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  color       String?
+  icon        String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products    Product[]
+
+  @@unique([storeId, name])
+}
+
+model Product {
+  id                    String                 @id @default(cuid())
+  barcode               String?
+  sku                   String?
+  name                  String
+  description           String?
+  image                 String?
+  costPrice             Float?
+  sellingPrice          Float
+  stockQuantity         Int                    @default(0)
+  minimumStock          Int                    @default(0)
+  brand                 String?
+  unit                  String?
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  storeId               String
+  categoryId            String
+  inventoryTransactions InventoryTransaction[]
+  category              Category               @relation(fields: [categoryId], references: [id])
+  store                 Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, barcode])
+  @@index([categoryId])
+  @@index([storeId, isActive])
+  @@index([storeId, name])
+}
+
+model Customer {
+  id             String   @id @default(cuid())
+  customerCode   String
+  firstName      String
+  lastName       String?
+  companyName    String?
+  phone          String
+  email          String?
+  address        String?
+  city           String?
+  notes          String?
+  creditLimit    Float    @default(0)
+  currentBalance Float    @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  storeId        String
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sales          Sale[]
+
+  @@unique([storeId, customerCode])
+  @@unique([storeId, phone])
+  @@index([storeId, isActive])
+  @@index([storeId, createdAt])
+}
+
+model InventoryTransaction {
+  id              String          @id @default(cuid())
+  transactionType TransactionType
+  quantity        Int
+  previousStock   Int
+  newStock        Int
+  reason          String
+  reference       String?
+  createdAt       DateTime        @default(now())
+  storeId         String
+  productId       String
+  createdBy       String
+  creator         User            @relation(fields: [createdBy], references: [id])
+  product         Product         @relation(fields: [productId], references: [id])
+  store           Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+  @@index([productId])
+}
+
+model Sale {
+  id            String        @id @default(cuid())
+  saleNumber    String
+  subtotal      Float
+  discount      Float         @default(0)
+  tax           Float         @default(0)
+  total         Float
+  amountPaid    Float
+  changeGiven   Float         @default(0)
+  paymentMethod PaymentMethod
+  status        SaleStatus    @default(COMPLETED)
+  createdAt     DateTime      @default(now())
+  storeId       String
+  customerId    String?
+  cashierId     String
+  cashier       User          @relation(fields: [cashierId], references: [id])
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  store         Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items         SaleItem[]
+
+  @@unique([storeId, saleNumber])
+  @@index([storeId, createdAt])
+  @@index([storeId, cashierId])
+  @@index([storeId, status])
+  @@index([storeId, paymentMethod])
+}
+
+model SaleItem {
+  id          String  @id @default(cuid())
+  productId   String
+  productName String
+  barcode     String?
+  quantity    Int
+  unitPrice   Float
+  costPrice   Float?
+  discount    Float   @default(0)
+  total       Float
+  saleId      String
+  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PRO
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  INACTIVE
+  CANCELLED
+  EXPIRED
+  SUSPENDED
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum BillingProvider {
+  ZAAD
+  EVC_PLUS
+  SAHAL
+  STRIPE
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  CASHIER
+}
+
+enum TransactionType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+enum PaymentMethod {
+  CASH
+  ZAAD
+  EVC_PLUS
+  SAHAL
+  CARD
+}
+
+enum SaleStatus {
+  COMPLETED
+  VOID
+}
+
+model EmailLog {
+  id           String    @id @default(cuid())
+  to           String
+  template     String
+  provider     String
+  status       String    @default("PENDING")
+  subject      String?
+  retryCount   Int       @default(0)
+  maxRetries   Int       @default(3)
+  errorMessage String?
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
