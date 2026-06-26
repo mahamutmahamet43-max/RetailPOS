@@ -49,7 +49,7 @@ export default function DashboardLayout({
 
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <SheetContent side="left" className="p-0 w-56">
-          <DashboardSidebar />
+          <DashboardSidebar className="flex" />
         </SheetContent>
       </Sheet>
 

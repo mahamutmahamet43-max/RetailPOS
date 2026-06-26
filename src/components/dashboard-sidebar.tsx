@@ -26,7 +26,7 @@ const sidebarItems = [
   { href: "/dashboard/settings", label: "settings", icon: Settings },
 ] as const
 
-export function DashboardSidebar() {
+export function DashboardSidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const t = useTranslations("nav")
   const locale = pathname.split("/")[1] || "en"
@@ -34,7 +34,7 @@ export function DashboardSidebar() {
   const items = sidebarItems
 
   return (
-    <aside className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col">
+    <aside className={cn("hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col", className)}>
       <div className="flex flex-col gap-2 border-r bg-card px-4 py-6 h-full">
         <Link
           href={`/${locale}/dashboard`}
