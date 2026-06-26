@@ -51,9 +51,6 @@
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
   },
-  "overrides": {
-    "nodemailer": "^9.0.1"
-  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2",
