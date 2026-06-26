@@ -1,21 +1,44 @@
-import NextAuth from "next-auth"
 import createMiddleware from "next-intl/middleware"
 import { NextRequest } from "next/server"
-import { authConfig } from "@/lib/auth.config"
 import { routing, defaultLocale, locales } from "@/i18n/routing"
+import { jwtDecrypt, calculateJwkThumbprint, base64url } from "jose"
+import { hkdf } from "@panva/hkdf"
 
 const intlMiddleware = createMiddleware(routing)
-
-const auth = NextAuth(authConfig).auth
 
 function getValidLocale(pathname: string): string {
   const segment = pathname.split("/")[1]
   return segment && (locales as readonly string[]).includes(segment) ? segment : defaultLocale
 }
 
-export default auth(async function middleware(
-  req: NextRequest & { auth: unknown }
-) {
+async function decryptSessionToken(token: string, secret: string, salt: string) {
+  const enc = "A256CBC-HS512"
+  const length = 64
+  const encryptionSecret = await hkdf(
+    "sha256",
+    new TextEncoder().encode(secret),
+    salt,
+    `Auth.js Generated Encryption Key (${salt})`,
+    length
+  )
+  const { payload } = await jwtDecrypt(token, async ({ kid }) => {
+    if (kid === undefined) return encryptionSecret
+    const hashAlg = encryptionSecret.byteLength << 3 === 512 ? "sha512" : encryptionSecret.byteLength << 3 === 384 ? "sha384" : "sha256"
+    const thumbprint = await calculateJwkThumbprint(
+      { kty: "oct", k: base64url.encode(encryptionSecret) },
+      hashAlg
+    )
+    if (kid === thumbprint) return encryptionSecret
+    throw new Error("no matching decryption secret")
+  }, {
+    clockTolerance: 15,
+    keyManagementAlgorithms: ["dir"],
+    contentEncryptionAlgorithms: [enc, "A256GCM"],
+  })
+  return payload
+}
+
+export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
   const locale = getValidLocale(pathname)
 
@@ -26,44 +49,53 @@ export default auth(async function middleware(
     pathnameWithoutLocale.startsWith("/register")
   const isDashboardPage = pathnameWithoutLocale.startsWith("/dashboard")
   const isBillingPage = pathnameWithoutLocale.startsWith("/dashboard/billing")
-  const isApiRoute = pathnameWithoutLocale.startsWith("/api")
-  const isLoggedIn = !!req.auth
 
-  if (isDashboardPage && !isLoggedIn) {
-    const loginUrl = new URL(`/${locale}/login`, req.url)
-    loginUrl.searchParams.set("callbackUrl", pathname)
-    return Response.redirect(loginUrl)
-  }
+  if (isDashboardPage || isAuthPage) {
+    const isProduction = process.env.NODE_ENV === "production"
+    const cookieName = isProduction
+      ? "__Secure-next-auth.session-token"
+      : "next-auth.session-token"
+    const cookie = req.cookies.get(cookieName)?.value
 
-  if (isAuthPage && isLoggedIn) {
-    return Response.redirect(new URL(`/${locale}/dashboard`, req.url))
-  }
+    let session: Record<string, unknown> | null = null
+    const secret = process.env.AUTH_SECRET
 
-  if (isDashboardPage && isLoggedIn && !isBillingPage && !isApiRoute) {
-    const authToken = (req as any).auth as {
-      user?: { subscriptionStatus?: string; subscriptionEndsAt?: string }
-    } | null
+    if (cookie && secret) {
+      try {
+        session = (await decryptSessionToken(cookie, secret, cookieName)) as Record<string, unknown>
+      } catch {
+        // Invalid token
+      }
+    }
 
-    if (authToken?.user?.subscriptionStatus) {
-      const status = authToken.user.subscriptionStatus
-      const endsAt = authToken.user.subscriptionEndsAt
+    const isLoggedIn = !!session
 
-      if (status === "EXPIRED" || status === "SUSPENDED" || status === "CANCELLED") {
-        return Response.redirect(
-          new URL(`/${locale}/dashboard/billing`, req.url)
-        )
+    if (isDashboardPage && !isLoggedIn) {
+      const loginUrl = new URL(`/${locale}/login`, req.url)
+      loginUrl.searchParams.set("callbackUrl", pathname)
+      return Response.redirect(loginUrl)
+    }
+
+    if (isAuthPage && isLoggedIn) {
+      return Response.redirect(new URL(`/${locale}/dashboard`, req.url))
+    }
+
+    if (isDashboardPage && isLoggedIn && !isBillingPage && session) {
+      const subscriptionStatus = session.subscriptionStatus as string | undefined
+      const subscriptionEndsAt = session.subscriptionEndsAt as string | undefined
+
+      if (subscriptionStatus === "EXPIRED" || subscriptionStatus === "SUSPENDED" || subscriptionStatus === "CANCELLED") {
+        return Response.redirect(new URL(`/${locale}/dashboard/billing`, req.url))
       }
 
-      if (status === "TRIAL" && endsAt && new Date(endsAt) < new Date()) {
-        return Response.redirect(
-          new URL(`/${locale}/dashboard/billing`, req.url)
-        )
+      if (subscriptionStatus === "TRIAL" && subscriptionEndsAt && new Date(subscriptionEndsAt) < new Date()) {
+        return Response.redirect(new URL(`/${locale}/dashboard/billing`, req.url))
       }
     }
   }
 
   return intlMiddleware(req)
-})
+}
 
 export const config = {
   matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
