@@ -46,7 +46,8 @@ interface PharmacyDashboardData {
   outOfStockMedicines: number
   expiredBatches: number
   expiringSoonBatches: number
-  todayPurchases: number
+  expiring90Batches: number
+  todayPurchases: { count: number; total: number }
 }
 
 interface ChartData {
@@ -227,7 +228,7 @@ export function DashboardPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-medium">Expiring Soon</CardTitle>
+                <CardTitle className="text-xs font-medium">Expiring ≤30d</CardTitle>
                 <FlaskConical className="h-4 w-4 text-orange-500" />
               </CardHeader>
               <CardContent>
@@ -236,11 +237,23 @@ export function DashboardPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-medium">Expiring 31-90d</CardTitle>
+                <FlaskConical className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-amber-500">{pharmacyData.expiring90Batches}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-xs font-medium">Today Purchases</CardTitle>
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-xl font-bold">{pharmacyData.todayPurchases}</div>
+                <div className="text-xl font-bold">{pharmacyData.todayPurchases.count}</div>
+                <div className="text-xs text-muted-foreground">
+                  ${(pharmacyData.todayPurchases.total ?? 0).toFixed(2)}
+                </div>
               </CardContent>
             </Card>
             <Card>

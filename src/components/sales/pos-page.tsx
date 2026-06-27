@@ -63,6 +63,9 @@ interface ProductResult {
   barcode: string | null
   sellingPrice: number
   stockQuantity: number
+  genericName?: string | null
+  form?: string | null
+  strength?: string | null
 }
 
 export function PosPage() {
@@ -296,15 +299,20 @@ export function PosPage() {
                       onClick={() => addToCart(product)}
                       className="w-full flex items-center justify-between px-3 py-3 lg:py-2 text-sm hover:bg-accent rounded-sm text-left min-h-11"
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <span className="font-medium">{product.name}</span>
-                        {product.barcode && (
+                        {product.genericName && (
                           <span className="ml-2 text-xs text-muted-foreground">
-                            {product.barcode}
+                            ({product.genericName})
                           </span>
                         )}
+                        <div className="text-xs text-muted-foreground">
+                          {product.form && <span>{product.form}</span>}
+                          {product.strength && <span> {product.strength}</span>}
+                          {product.barcode && <span className="ml-2 font-mono">{product.barcode}</span>}
+                        </div>
                       </div>
-                      <div className="text-right text-xs text-muted-foreground">
+                      <div className="text-right text-xs text-muted-foreground shrink-0 ml-2">
                         <div>${product.sellingPrice.toFixed(2)}</div>
                         <div>
                           {t("stock")}: {product.stockQuantity}

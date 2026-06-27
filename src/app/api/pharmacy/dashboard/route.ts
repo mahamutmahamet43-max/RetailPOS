@@ -30,6 +30,8 @@ export async function GET() {
 
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+    const ninetyDaysFromNow = new Date()
+    ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90)
 
     const [
       todaySalesAgg,
@@ -41,6 +43,7 @@ export async function GET() {
       todayPurchasesAgg,
       recentSales,
       recentExpiredItems,
+      expiring90Batches,
     ] = await Promise.all([
       prisma.sale.aggregate({
         where: {
@@ -115,6 +118,13 @@ export async function GET() {
         orderBy: { expiryDate: "desc" },
         take: 5,
       }),
+      prisma.medicineBatch.count({
+        where: {
+          expiryDate: { gte: thirtyDaysFromNow, lte: ninetyDaysFromNow },
+          quantity: { gt: 0 },
+          product: { storeId: store.id },
+        },
+      }),
     ])
 
     const lowStockMedicines = allStockedProducts.filter(
@@ -137,6 +147,7 @@ export async function GET() {
       },
       recentSales,
       recentExpiredItems,
+      expiring90Batches,
     })
   } catch (error) {
     logger.error("GET /api/pharmacy/dashboard error", error instanceof Error ? error : undefined)

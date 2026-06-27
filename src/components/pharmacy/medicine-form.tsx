@@ -354,12 +354,16 @@ export function MedicineForm({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="m-unit">Unit</Label>
-                <Input
-                  id="m-unit"
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  placeholder="tablet, ml, etc."
-                />
+                <Select value={unit || ""} onValueChange={setUnit}>
+                  <SelectTrigger id="m-unit">
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["Piece","Tablet","Capsule","Bottle","Strip","Box","Pack","Tube","Sachet","Vial","Ampoule"].map((u) => (
+                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
