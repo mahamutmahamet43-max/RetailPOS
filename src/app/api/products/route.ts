@@ -33,16 +33,24 @@ export async function GET(request: Request) {
         : {}),
     }
 
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        include: { category: { select: { id: true, name: true } }, units: true },
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      prisma.product.count({ where }),
-    ])
+    const rawProducts = await prisma.product.findMany({
+      where,
+      include: { category: { select: { id: true, name: true } }, units: true },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    })
+
+    const products = rawProducts.map((p: any) => ({
+      ...p,
+      units: (p.units || []).map((u: any) => ({
+        ...u,
+        conversionFactor: Number(u.conversionFactor),
+        sellingPrice: u.sellingPrice !== null && u.sellingPrice !== undefined ? Number(u.sellingPrice) : null,
+      })),
+    }))
+
+    const total = await prisma.product.count({ where })
 
     return NextResponse.json({
       products,

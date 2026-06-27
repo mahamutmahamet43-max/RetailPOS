@@ -166,7 +166,7 @@ export function PosPage() {
       productUnitId: defaultUnit.id,
       unitName: defaultUnit.name,
       unitConversionFactor: defaultUnit.conversionFactor,
-      unitPrice: defaultUnit.sellingPrice,
+      unitPrice: Number(defaultUnit.sellingPrice) || product.sellingPrice,
     }
   }
 
@@ -227,7 +227,7 @@ export function PosPage() {
           productUnitId: unit.id,
           unitName: unit.name,
           unitConversionFactor: unit.conversionFactor,
-          unitPrice: unit.sellingPrice,
+          unitPrice: Number(unit.sellingPrice) || 0,
         }
       })
     )

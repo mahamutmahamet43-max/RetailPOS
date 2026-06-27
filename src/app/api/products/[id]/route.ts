@@ -17,7 +17,7 @@ export async function GET(
     if (!store) return noStoreResponse()
     const { id } = await params
 
-    const product = await prisma.product.findFirst({
+    let product = await prisma.product.findFirst({
       where: { id, storeId: store.id },
       include: { category: true, units: true },
     })
@@ -29,7 +29,16 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(product)
+    const result = {
+      ...product,
+      units: product.units.map((u) => ({
+        ...u,
+        conversionFactor: Number(u.conversionFactor),
+        sellingPrice: u.sellingPrice !== null ? Number(u.sellingPrice) : null,
+      })),
+    }
+
+    return NextResponse.json(result)
   } catch (error) {
     logger.error("GET /api/products/[id] error", error instanceof Error ? error : undefined)
     return NextResponse.json(
