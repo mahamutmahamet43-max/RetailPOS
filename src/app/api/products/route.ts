@@ -112,6 +112,8 @@ export async function POST(request: Request) {
         sellingPrice: data.sellingPrice,
         stockQuantity: data.stockQuantity,
         minimumStock: data.minimumStock,
+        unit: data.unit || null,
+        brand: data.brand || null,
         isActive: data.isActive,
         storeId: store.id,
         categoryId: data.categoryId,
