@@ -38,6 +38,13 @@ export const productSchema = z.object({
   description: z.string().optional().nullable(),
   imageUrl: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
+  manufacturer: z.string().optional().nullable(),
+  genericName: z.string().optional().nullable(),
+  dosage: z.string().optional().nullable(),
+  strength: z.string().optional().nullable(),
+  form: z.string().optional().nullable(),
+  prescriptionRequired: z.boolean().optional().default(false),
+  medicineCategory: z.string().optional().nullable(),
 })
 
 export const categorySchema = z.object({

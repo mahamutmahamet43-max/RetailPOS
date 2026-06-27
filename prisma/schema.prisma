@@ -38,6 +38,8 @@ model Store {
   inventoryTransactions InventoryTransaction[]
   products              Product[]
   sales                 Sale[]
+  suppliers             Supplier[]
+  purchases             Purchase[]
   owner                 User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   subscription          Subscription?
   settings              StoreSetting?
@@ -95,6 +97,7 @@ model StoreSetting {
   emailNotification Boolean @default(true)
   logoUrl          String?
   twoFactorEnabled Boolean  @default(false)
+  enablePharmacyModule Boolean @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   storeId          String   @unique
@@ -131,11 +134,19 @@ model Product {
   brand                 String?
   unit                  String?
   isActive              Boolean                @default(true)
+  manufacturer          String?
+  genericName           String?
+  dosage                String?
+  strength              String?
+  form                  String?
+  prescriptionRequired  Boolean                @default(false)
+  medicineCategory      String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   storeId               String
   categoryId            String
   inventoryTransactions InventoryTransaction[]
+  batches               MedicineBatch[]
   category              Category               @relation(fields: [categoryId], references: [id])
   store                 Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -164,6 +175,7 @@ model Customer {
   storeId        String
   store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   sales          Sale[]
+  prescriptions  Prescription[]
 
   @@unique([storeId, customerCode])
   @@unique([storeId, phone])
@@ -172,20 +184,23 @@ model Customer {
 }
 
 model InventoryTransaction {
-  id              String          @id @default(cuid())
-  transactionType TransactionType
-  quantity        Int
-  previousStock   Int
-  newStock        Int
-  reason          String
-  reference       String?
-  createdAt       DateTime        @default(now())
-  storeId         String
-  productId       String
-  createdBy       String
-  creator         User            @relation(fields: [createdBy], references: [id])
-  product         Product         @relation(fields: [productId], references: [id])
-  store           Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id               String           @id @default(cuid())
+  transactionType  TransactionType
+  quantity         Int
+  previousStock    Int
+  newStock         Int
+  reason           String
+  reference        String?
+  adjustmentReason AdjustmentReason?
+  createdAt        DateTime         @default(now())
+  storeId          String
+  productId        String
+  createdBy        String
+  purchaseId       String?
+  creator          User             @relation(fields: [createdBy], references: [id])
+  product          Product          @relation(fields: [productId], references: [id])
+  store            Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchase         Purchase?        @relation(fields: [purchaseId], references: [id])
 
   @@index([storeId, createdAt])
   @@index([productId])
@@ -210,6 +225,7 @@ model Sale {
   customer      Customer?     @relation(fields: [customerId], references: [id])
   store         Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
   items         SaleItem[]
+  prescriptions Prescription[]
 
   @@unique([storeId, saleNumber])
   @@index([storeId, createdAt])
@@ -267,6 +283,92 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model MedicineBatch {
+  id           String   @id @default(cuid())
+  productId    String
+  batchNumber  String
+  expiryDate   DateTime
+  purchasePrice Float?
+  sellingPrice Float?
+  quantity     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchaseItem PurchaseItem?
+
+  @@unique([productId, batchNumber])
+  @@index([productId])
+  @@index([expiryDate])
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchases Purchase[]
+
+  @@index([storeId])
+}
+
+model Purchase {
+  id              String          @id @default(cuid())
+  purchaseNumber  String
+  supplierId      String?
+  supplierName    String
+  notes           String?
+  totalAmount     Float
+  status          PurchaseStatus  @default(PENDING)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  storeId         String
+  supplier        Supplier?       @relation(fields: [supplierId], references: [id])
+  store           Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items           PurchaseItem[]
+  transactions    InventoryTransaction[]
+
+  @@unique([storeId, purchaseNumber])
+  @@index([storeId, createdAt])
+}
+
+model PurchaseItem {
+  id              String        @id @default(cuid())
+  purchaseId      String
+  productId       String
+  productName     String
+  quantity        Int
+  unitCost        Float
+  totalCost       Float
+  batchId         String?        @unique
+  batch           MedicineBatch? @relation(fields: [batchId], references: [id])
+  purchase        Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+model Prescription {
+  id                 String   @id @default(cuid())
+  customerId         String
+  saleId             String?
+  doctorName         String?
+  prescriptionNumber String?
+  notes              String?
+  createdAt          DateTime @default(now())
+  customer           Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sale               Sale?    @relation(fields: [saleId], references: [id])
+
+  @@index([customerId])
+  @@index([saleId])
+  @@index([createdAt])
 }
 
 enum SubscriptionPlan {
@@ -329,6 +431,20 @@ enum PaymentMethod {
 enum SaleStatus {
   COMPLETED
   VOID
+}
+
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum AdjustmentReason {
+  DAMAGED
+  EXPIRED
+  STOLEN
+  LOST
+  CORRECTION
 }
 
 model EmailLog {

@@ -225,9 +225,39 @@ export async function POST(request: Request) {
 
       saleId = createdSale.id
 
+      const storeSetting = await tx.storeSetting.findUnique({
+        where: { storeId: store.id },
+        select: { enablePharmacyModule: true },
+      })
+      const pharmacyEnabled = storeSetting?.enablePharmacyModule ?? false
+
       for (const item of items) {
         const product = productMap.get(item.productId)!
-        const newStock = product.stockQuantity - item.quantity
+        let newStock = product.stockQuantity - item.quantity
+
+        if (pharmacyEnabled && product.form) {
+          const fefoBatches = await tx.medicineBatch.findMany({
+            where: {
+              productId: item.productId,
+              quantity: { gt: 0 },
+              expiryDate: { gt: new Date() },
+            },
+            orderBy: { expiryDate: "asc" },
+          })
+          let remaining = item.quantity
+          for (const batch of fefoBatches) {
+            if (remaining <= 0) break
+            const take = Math.min(remaining, batch.quantity)
+            await tx.medicineBatch.update({
+              where: { id: batch.id },
+              data: { quantity: batch.quantity - take },
+            })
+            remaining -= take
+          }
+          if (remaining > 0) {
+            throw new Error(`Insufficient stock for ${product.name}. Available batches exhausted.`)
+          }
+        }
 
         await tx.product.update({
           where: { id: item.productId },

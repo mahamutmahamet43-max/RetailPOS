@@ -29,6 +29,7 @@ export async function GET(request: Request) {
               { barcode: { contains: search, mode: "insensitive" as const } },
               { sku: { contains: search, mode: "insensitive" as const } },
               { brand: { contains: search, mode: "insensitive" as const } },
+              { genericName: { contains: search, mode: "insensitive" as const } },
             ],
           }
         : {}),
@@ -117,6 +118,13 @@ export async function POST(request: Request) {
         isActive: data.isActive,
         storeId: store.id,
         categoryId: data.categoryId,
+        manufacturer: data.manufacturer || null,
+        genericName: data.genericName || null,
+        dosage: data.dosage || null,
+        strength: data.strength || null,
+        form: data.form || null,
+        prescriptionRequired: data.prescriptionRequired ?? false,
+        medicineCategory: data.medicineCategory || null,
       },
       include: { category: { select: { id: true, name: true } } },
     })

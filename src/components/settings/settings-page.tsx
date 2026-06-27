@@ -100,6 +100,7 @@ export default function SettingsPage() {
   const [emailNotification, setEmailNotification] = React.useState(true)
   const [logoUrl, setLogoUrl] = React.useState("")
   const [twoFactorEnabled, setTwoFactorEnabled] = React.useState(false)
+  const [enablePharmacyModule, setEnablePharmacyModule] = React.useState(false)
 
   const [profileName, setProfileName] = React.useState("")
   const [profileEmail, setProfileEmail] = React.useState("")
@@ -130,6 +131,7 @@ export default function SettingsPage() {
           setEmailNotification(data.settings?.emailNotification ?? true)
           setLogoUrl(data.settings?.logoUrl || "")
           setTwoFactorEnabled(data.settings?.twoFactorEnabled ?? false)
+          setEnablePharmacyModule(data.settings?.enablePharmacyModule ?? false)
         }
       } catch {}
       try {
@@ -159,19 +161,20 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings/store", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: storeName,
-          address,
-          phone: storePhone,
-          email: storeEmail,
-          currency,
-          timezone,
-          dateFormat,
-          lowStockAlert,
-          salesNotification,
-          emailNotification,
-          logoUrl,
-        }),
+          body: JSON.stringify({
+            name: storeName,
+            address,
+            phone: storePhone,
+            email: storeEmail,
+            currency,
+            timezone,
+            dateFormat,
+            lowStockAlert,
+            salesNotification,
+            emailNotification,
+            logoUrl,
+            enablePharmacyModule,
+          }),
       })
       if (res.ok) {
         setSuccessMsg(t("saved"))
@@ -367,6 +370,16 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="address">{t("address")}</Label>
                 <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-4 mt-4">
+                <div className="space-y-0.5">
+                  <Label>Pharmacy Module</Label>
+                  <p className="text-sm text-muted-foreground">Enable medicine inventory, batch tracking, FEFO, and prescription management</p>
+                </div>
+                <Switch
+                  checked={enablePharmacyModule}
+                  onCheckedChange={setEnablePharmacyModule}
+                />
               </div>
             </CardContent>
           </Card>

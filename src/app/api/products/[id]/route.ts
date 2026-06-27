@@ -78,6 +78,13 @@ export async function PATCH(
       unit,
       isActive,
       categoryId,
+      manufacturer,
+      genericName,
+      dosage,
+      strength,
+      form,
+      prescriptionRequired,
+      medicineCategory,
     } = body
 
     if (name !== undefined) {
@@ -142,6 +149,13 @@ export async function PATCH(
         ...(unit !== undefined && { unit: unit || null }),
         ...(isActive !== undefined && { isActive }),
         ...(categoryId !== undefined && { categoryId }),
+        ...(manufacturer !== undefined && { manufacturer: manufacturer || null }),
+        ...(genericName !== undefined && { genericName: genericName || null }),
+        ...(dosage !== undefined && { dosage: dosage || null }),
+        ...(strength !== undefined && { strength: strength || null }),
+        ...(form !== undefined && { form: form || null }),
+        ...(prescriptionRequired !== undefined && { prescriptionRequired }),
+        ...(medicineCategory !== undefined && { medicineCategory: medicineCategory || null }),
       },
       include: { category: true },
     })
