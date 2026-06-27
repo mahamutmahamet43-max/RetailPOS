@@ -1,13 +1,18 @@
 const CACHE_NAME = "retailpos-v1"
 const STATIC_ASSETS = [
   "/",
-  "/offline",
 ]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS)
+      return Promise.allSettled(
+        STATIC_ASSETS.map((url) =>
+          cache.add(url).catch(() => {
+            console.warn("Failed to cache:", url)
+          })
+        )
+      )
     })
   )
   self.skipWaiting()
@@ -48,7 +53,7 @@ self.addEventListener("fetch", (event) => {
             return response
           })
           .catch(() => {
-            return caches.match("/offline")
+            return new Response("Offline", { status: 503 })
           })
       )
     })
