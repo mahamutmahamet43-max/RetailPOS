@@ -159,6 +159,8 @@ export async function POST(request: Request) {
 
     const productMap = new Map(products.map((p) => [p.id, p]))
 
+    const stockMap = new Map(products.map((p) => [p.id, p.stockQuantity]))
+
     for (const item of items) {
       const product = productMap.get(item.productId)
       if (!product) {
@@ -167,14 +169,17 @@ export async function POST(request: Request) {
           { status: 404 }
         )
       }
-      if (product.stockQuantity < item.quantity) {
+      const baseRequested = Math.round(item.quantity * item.unitConversionFactor)
+      const available = stockMap.get(item.productId) ?? product.stockQuantity
+      if (available < baseRequested) {
         return NextResponse.json(
           {
-            error: `Insufficient stock for ${product.name}. Available: ${product.stockQuantity}, requested: ${item.quantity}`,
+            error: `Insufficient stock for ${product.name}. Available: ${available} ${product.unit || "pcs"}, requested: ${baseRequested}`,
           },
           { status: 400 }
         )
       }
+      stockMap.set(item.productId, available - baseRequested)
     }
 
     if (paymentMethod === "CASH" && paid < saleTotal) {
@@ -241,9 +246,13 @@ export async function POST(request: Request) {
       saleId = createdSale.id
 
       for (const item of items) {
-        const product = productMap.get(item.productId)!
+        const current = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { stockQuantity: true },
+        })
         const baseQuantity = Math.round(item.quantity * item.unitConversionFactor)
-        let newStock = product.stockQuantity - baseQuantity
+        const previousStock = current?.stockQuantity ?? 0
+        const newStock = previousStock - baseQuantity
 
         await tx.product.update({
           where: { id: item.productId },
@@ -254,7 +263,7 @@ export async function POST(request: Request) {
           data: {
             transactionType: "OUT",
             quantity: baseQuantity,
-            previousStock: product.stockQuantity,
+            previousStock,
             newStock,
             reason: `Sale #${saleNumber}`,
             storeId: store.id,

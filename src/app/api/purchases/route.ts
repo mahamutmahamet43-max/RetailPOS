@@ -133,9 +133,13 @@ export async function POST(request: Request) {
 
       if (isCompleted) {
         for (const item of items) {
-          const product = productMap.get(item.productId)!
+          const current = await tx.product.findUnique({
+            where: { id: item.productId },
+            select: { stockQuantity: true },
+          })
           const baseQuantity = Math.round(item.quantity * item.unitConversionFactor)
-          const newStock = product.stockQuantity + baseQuantity
+          const previousStock = current?.stockQuantity ?? 0
+          const newStock = previousStock + baseQuantity
 
           await tx.product.update({
             where: { id: item.productId },
@@ -146,7 +150,7 @@ export async function POST(request: Request) {
             data: {
               transactionType: "IN",
               quantity: baseQuantity,
-              previousStock: product.stockQuantity,
+              previousStock,
               newStock,
               reason: `Purchase #${invoiceNumber}`,
               storeId: store.id,
