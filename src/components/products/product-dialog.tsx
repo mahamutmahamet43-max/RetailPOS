@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
+import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,13 +22,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { Product, CategoryInfo } from "./products-table"
+import type { Product, CategoryInfo, ProductUnitInfo } from "./products-table"
+
+interface UnitRow {
+  key: string
+  id?: string
+  name: string
+  conversionFactor: string
+  sellingPrice: string
+  barcode: string
+  isBaseUnit: boolean
+  isDefaultSaleUnit: boolean
+}
 
 interface ProductDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   product?: Product | null
   onSuccess: () => void
+}
+
+function emptyUnit(): UnitRow {
+  return {
+    key: Math.random().toString(36).slice(2),
+    name: "",
+    conversionFactor: "1",
+    sellingPrice: "",
+    barcode: "",
+    isBaseUnit: false,
+    isDefaultSaleUnit: false,
+  }
 }
 
 export function ProductDialog({
@@ -54,6 +78,7 @@ export function ProductDialog({
   const [unit, setUnit] = React.useState("")
   const [categoryId, setCategoryId] = React.useState("")
   const [isActive, setIsActive] = React.useState(true)
+  const [units, setUnits] = React.useState<UnitRow[]>([])
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState("")
 
@@ -73,6 +98,20 @@ export function ProductDialog({
       setUnit(product?.unit || "")
       setCategoryId(product?.categoryId || "")
       setIsActive(product?.isActive ?? true)
+      setUnits(
+        product?.units && product.units.length > 0
+          ? product.units.map((u: ProductUnitInfo) => ({
+              key: u.id,
+              id: u.id,
+              name: u.name,
+              conversionFactor: String(u.conversionFactor),
+              sellingPrice: u.sellingPrice ? String(u.sellingPrice) : "",
+              barcode: u.barcode || "",
+              isBaseUnit: u.isBaseUnit,
+              isDefaultSaleUnit: u.isDefaultSaleUnit,
+            }))
+          : []
+      )
       setError("")
     }
   }, [open, product])
@@ -86,6 +125,27 @@ export function ProductDialog({
       }
     } catch {
       console.error("Failed to fetch categories")
+    }
+  }
+
+  function addUnit() {
+    setUnits((prev) => [...prev, emptyUnit()])
+  }
+
+  function removeUnit(key: string) {
+    setUnits((prev) => prev.filter((u) => u.key !== key))
+  }
+
+  function updateUnit(key: string, field: keyof UnitRow, value: string | boolean) {
+    setUnits((prev) =>
+      prev.map((u) => (u.key === key ? { ...u, [field]: value } : u))
+    )
+  }
+
+  function updateSellingPriceFromUnits() {
+    const base = units.find((u) => u.isBaseUnit)
+    if (base && base.sellingPrice) {
+      setSellingPrice(base.sellingPrice)
     }
   }
 
@@ -109,6 +169,12 @@ export function ProductDialog({
       return
     }
 
+    const hasBaseUnit = units.length === 0 || units.some((u) => u.isBaseUnit)
+    if (units.length > 0 && !hasBaseUnit) {
+      setError("At least one unit must be marked as the base unit")
+      return
+    }
+
     setSaving(true)
 
     try {
@@ -128,6 +194,15 @@ export function ProductDialog({
         unit: unit || null,
         categoryId,
         isActive,
+        units: units.map((u) => ({
+          id: u.id || undefined,
+          name: u.name,
+          conversionFactor: parseFloat(u.conversionFactor) || 1,
+          sellingPrice: u.sellingPrice ? parseFloat(u.sellingPrice) : undefined,
+          barcode: u.barcode || null,
+          isBaseUnit: u.isBaseUnit,
+          isDefaultSaleUnit: u.isDefaultSaleUnit,
+        })),
       })
 
       const res = await fetch(url, {
@@ -317,6 +392,117 @@ export function ProductDialog({
                   }}
                 />
               )}
+            </div>
+
+            <div className="space-y-3 border rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Units / Packaging</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addUnit}>
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add Unit
+                </Button>
+              </div>
+              {units.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No units defined. The product will use the default unit above.
+                </p>
+              )}
+              {units.map((u, idx) => (
+                <div key={u.key} className="rounded-md border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Unit {idx + 1}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => removeUnit(u.key)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Name</Label>
+                      <Input
+                        value={u.name}
+                        onChange={(e) => updateUnit(u.key, "name", e.target.value)}
+                        placeholder="e.g. Tablet"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Conversion Factor</Label>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        value={u.conversionFactor}
+                        onChange={(e) => updateUnit(u.key, "conversionFactor", e.target.value)}
+                        placeholder="1"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Selling Price</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={u.sellingPrice}
+                        onChange={(e) => updateUnit(u.key, "sellingPrice", e.target.value)}
+                        placeholder="0.00"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Barcode</Label>
+                      <Input
+                        value={u.barcode}
+                        onChange={(e) => updateUnit(u.key, "barcode", e.target.value)}
+                        placeholder="Optional"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={u.isBaseUnit}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          setUnits((prev) =>
+                            prev.map((pu) =>
+                              pu.key === u.key
+                                ? { ...pu, isBaseUnit: checked, isDefaultSaleUnit: checked ? true : pu.isDefaultSaleUnit }
+                                : checked ? { ...pu, isBaseUnit: false } : pu
+                            )
+                          )
+                          if (checked && u.sellingPrice) {
+                            setSellingPrice(u.sellingPrice)
+                          }
+                        }}
+                        className="h-3 w-3"
+                      />
+                      Base Unit
+                    </label>
+                    <label className="flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={u.isDefaultSaleUnit}
+                        onChange={(e) => updateUnit(u.key, "isDefaultSaleUnit", e.target.checked)}
+                        className="h-3 w-3"
+                      />
+                      Default Sale Unit
+                    </label>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="flex items-center gap-2">

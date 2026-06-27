@@ -101,6 +101,8 @@ export async function POST(request: Request) {
       }
     }
 
+    const baseUnit = data.units?.find((u) => u.isBaseUnit)
+
     const product = await prisma.product.create({
       data: {
         barcode: data.barcode || null,
@@ -109,18 +111,30 @@ export async function POST(request: Request) {
         description: data.description || null,
         image: data.imageUrl || null,
         costPrice: data.costPrice,
-        sellingPrice: data.sellingPrice,
+        sellingPrice: baseUnit?.sellingPrice ?? data.sellingPrice,
         stockQuantity: data.stockQuantity,
         minimumStock: data.minimumStock,
-        unit: data.unit || null,
+        unit: baseUnit?.name ?? data.unit ?? null,
         brand: data.brand || null,
         isActive: data.isActive,
         storeId: store.id,
         categoryId: data.categoryId,
         isPharmacyItem: data.isPharmacyItem ?? false,
         requiresPrescription: data.requiresPrescription ?? false,
+        ...(data.units && {
+          units: {
+            create: data.units.map((u) => ({
+              name: u.name,
+              conversionFactor: u.conversionFactor,
+              sellingPrice: u.sellingPrice ?? 0,
+              barcode: u.barcode ?? null,
+              isBaseUnit: u.isBaseUnit,
+              isDefaultSaleUnit: u.isDefaultSaleUnit,
+            })),
+          },
+        }),
       },
-      include: { category: { select: { id: true, name: true } } },
+      include: { category: { select: { id: true, name: true } }, units: true },
     })
 
     return NextResponse.json(product, { status: 201 })

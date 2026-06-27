@@ -97,6 +97,8 @@ export async function PATCH(
       }
     }
 
+    const baseUnit = data.units?.find((u) => u.isBaseUnit)
+
     const product = await prisma.product.update({
       where: { id },
       data: {
@@ -106,20 +108,59 @@ export async function PATCH(
         ...(data.description !== undefined && { description: data.description || null }),
         ...(data.imageUrl !== undefined && { image: data.imageUrl || null }),
         ...(data.costPrice !== undefined && { costPrice: data.costPrice }),
-        ...(data.sellingPrice !== undefined && { sellingPrice: data.sellingPrice }),
+        ...(data.sellingPrice !== undefined && { sellingPrice: baseUnit?.sellingPrice ?? data.sellingPrice }),
         ...(data.stockQuantity !== undefined && { stockQuantity: data.stockQuantity }),
         ...(data.minimumStock !== undefined && { minimumStock: data.minimumStock }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
         ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
-        ...(data.unit !== undefined && { unit: data.unit || null }),
+        ...(data.unit !== undefined && { unit: baseUnit?.name ?? data.unit ?? null }),
         ...(data.brand !== undefined && { brand: data.brand || null }),
         ...(data.isPharmacyItem !== undefined && { isPharmacyItem: data.isPharmacyItem }),
         ...(data.requiresPrescription !== undefined && { requiresPrescription: data.requiresPrescription }),
       },
-      include: { category: true },
+      include: { category: true, units: true },
     })
 
-    return NextResponse.json(product)
+    if (data.units) {
+      const incomingIds = data.units.filter((u) => u.id).map((u) => u.id!)
+      await prisma.productUnit.deleteMany({
+        where: { productId: id, id: { notIn: incomingIds } },
+      })
+      for (const u of data.units) {
+        if (u.id) {
+          await prisma.productUnit.update({
+            where: { id: u.id },
+            data: {
+              name: u.name,
+              conversionFactor: u.conversionFactor,
+              sellingPrice: u.sellingPrice ?? 0,
+              barcode: u.barcode ?? null,
+              isBaseUnit: u.isBaseUnit,
+              isDefaultSaleUnit: u.isDefaultSaleUnit,
+            },
+          })
+        } else {
+          await prisma.productUnit.create({
+            data: {
+              productId: id,
+              name: u.name,
+              conversionFactor: u.conversionFactor,
+              sellingPrice: u.sellingPrice ?? 0,
+              barcode: u.barcode ?? null,
+              isBaseUnit: u.isBaseUnit,
+              isDefaultSaleUnit: u.isDefaultSaleUnit,
+            },
+          })
+        }
+      }
+    }
+
+    const updated = await prisma.product.findUnique({
+      where: { id },
+      include: { category: true, units: true },
+    })
+
+    return NextResponse.json(updated)
   } catch (error) {
     logger.error("PATCH /api/products/[id] error", error instanceof Error ? error : undefined)
     return NextResponse.json(
