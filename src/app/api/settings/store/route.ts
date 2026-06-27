@@ -1,17 +1,33 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
+import { requireRole } from "@/lib/role"
+import { z } from "zod"
+import { validateOrError } from "@/lib/api-validation"
+
+const storeSettingsSchema = z.object({
+  name: z.string().min(1, "Store name is required").optional(),
+  description: z.string().optional().nullable(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email("Invalid email").optional(),
+  currency: z.string().optional(),
+  timezone: z.string().optional(),
+  dateFormat: z.string().optional(),
+  logoUrl: z.string().optional().nullable(),
+  lowStockAlert: z.boolean().optional(),
+  salesNotification: z.boolean().optional(),
+  emailNotification: z.boolean().optional(),
+  twoFactorEnabled: z.boolean().optional(),
+})
 
 export async function GET() {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const authResult = await requireRole("OWNER")
+    if (authResult instanceof NextResponse) return authResult
 
     const store = await prisma.store.findFirst({
-      where: { ownerId: session.user.id },
+      where: { ownerId: authResult.userId },
       select: {
         name: true,
         description: true,
@@ -50,25 +66,45 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const authResult = await requireRole("OWNER")
+    if (authResult instanceof NextResponse) return authResult
 
     const body = await request.json()
+    const validation = validateOrError(storeSettingsSchema, body)
+    if (!validation.success) return validation.response
+    const validBody = validation.data
 
-    const store = await prisma.store.findFirst({
-      where: { ownerId: session.user.id },
+    let store = await prisma.store.findFirst({
+      where: { ownerId: authResult.userId },
     })
 
     if (!store) {
-      return NextResponse.json({ error: "No store found" }, { status: 404 })
+      const slug = (validBody.name || "store")
+        .toLowerCase().replace(/[^a-z0-9]/g, "-")
+        .replace(/-+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now()
+
+      store = await prisma.store.create({
+        data: {
+          name: validBody.name || "My Store",
+          slug,
+          ownerId: authResult.userId,
+          subscription: {
+            create: {
+              plan: "FREE",
+              status: "TRIAL",
+              startsAt: new Date(),
+              trialEndsAt: new Date(Date.now() + 14 * 86400000),
+              endsAt: new Date(Date.now() + 14 * 86400000),
+            },
+          },
+        },
+      })
     }
 
-    if (body.name) {
+    if (validBody.name) {
       await prisma.store.update({
         where: { id: store.id },
-        data: { name: body.name },
+        data: { name: validBody.name },
       })
     }
 
@@ -77,10 +113,10 @@ export async function PUT(request: Request) {
 
     const settingsData: Record<string, unknown> = {}
     for (const field of stringFields) {
-      if (body[field] !== undefined) settingsData[field] = String(body[field])
+      if (validBody[field as keyof typeof validBody] !== undefined) settingsData[field] = String(validBody[field as keyof typeof validBody])
     }
     for (const field of boolFields) {
-      if (body[field] !== undefined) settingsData[field] = Boolean(body[field])
+      if (validBody[field as keyof typeof validBody] !== undefined) settingsData[field] = Boolean(validBody[field as keyof typeof validBody])
     }
 
     if (Object.keys(settingsData).length > 0) {

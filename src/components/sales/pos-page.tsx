@@ -39,6 +39,14 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Receipt } from "@/components/sales/receipt"
 
+interface ProductUnit {
+  id: string
+  name: string
+  conversionFactor: number
+  sellingPrice: number
+  isDefaultSaleUnit: boolean
+}
+
 interface CartItem {
   productId: string
   productName: string
@@ -47,6 +55,10 @@ interface CartItem {
   unitPrice: number
   stockQuantity: number
   discount: number
+  productUnitId: string | null
+  unitName: string
+  unitConversionFactor: number
+  units: ProductUnit[]
 }
 
 interface Customer {
@@ -63,9 +75,7 @@ interface ProductResult {
   barcode: string | null
   sellingPrice: number
   stockQuantity: number
-  genericName?: string | null
-  form?: string | null
-  strength?: string | null
+  units: ProductUnit[]
 }
 
 export function PosPage() {
@@ -147,7 +157,21 @@ export function PosPage() {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
+  function getDefaultUnit(product: ProductResult): { productUnitId: string | null; unitName: string; unitConversionFactor: number; unitPrice: number } {
+    if (!product.units || product.units.length === 0) {
+      return { productUnitId: null, unitName: "pcs", unitConversionFactor: 1, unitPrice: product.sellingPrice }
+    }
+    const defaultUnit = product.units.find((u) => u.isDefaultSaleUnit) || product.units[0]
+    return {
+      productUnitId: defaultUnit.id,
+      unitName: defaultUnit.name,
+      unitConversionFactor: defaultUnit.conversionFactor,
+      unitPrice: defaultUnit.sellingPrice,
+    }
+  }
+
   function addToCart(product: ProductResult) {
+    const unitInfo = getDefaultUnit(product)
     setCart((prev) => {
       const existing = prev.find((i) => i.productId === product.id)
       if (existing) {
@@ -165,9 +189,13 @@ export function PosPage() {
           productName: product.name,
           barcode: product.barcode,
           quantity: 1,
-          unitPrice: product.sellingPrice,
+          unitPrice: unitInfo.unitPrice,
           stockQuantity: product.stockQuantity,
           discount: 0,
+          productUnitId: unitInfo.productUnitId,
+          unitName: unitInfo.unitName,
+          unitConversionFactor: unitInfo.unitConversionFactor,
+          units: product.units || [],
         },
       ]
     })
@@ -186,6 +214,23 @@ export function PosPage() {
         i.productId === productId ? { ...i, quantity: newQty } : i
       )
     })
+  }
+
+  function changeUnit(productId: string, unitId: string) {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.productId !== productId) return item
+        const unit = item.units.find((u) => u.id === unitId)
+        if (!unit) return item
+        return {
+          ...item,
+          productUnitId: unit.id,
+          unitName: unit.name,
+          unitConversionFactor: unit.conversionFactor,
+          unitPrice: unit.sellingPrice,
+        }
+      })
+    )
   }
 
   function removeItem(productId: string) {
@@ -224,6 +269,9 @@ export function PosPage() {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             discount: item.discount,
+            productUnitId: item.productUnitId,
+            unitName: item.unitName,
+            unitConversionFactor: item.unitConversionFactor,
           })),
           customerId: selectedCustomerId || null,
           paymentMethod,
@@ -301,16 +349,9 @@ export function PosPage() {
                     >
                       <div className="min-w-0 flex-1">
                         <span className="font-medium">{product.name}</span>
-                        {product.genericName && (
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            ({product.genericName})
-                          </span>
+                        {product.barcode && (
+                          <span className="ml-2 text-xs text-muted-foreground font-mono">{product.barcode}</span>
                         )}
-                        <div className="text-xs text-muted-foreground">
-                          {product.form && <span>{product.form}</span>}
-                          {product.strength && <span> {product.strength}</span>}
-                          {product.barcode && <span className="ml-2 font-mono">{product.barcode}</span>}
-                        </div>
                       </div>
                       <div className="text-right text-xs text-muted-foreground shrink-0 ml-2">
                         <div>${product.sellingPrice.toFixed(2)}</div>
@@ -329,11 +370,12 @@ export function PosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40%]">{t("product")}</TableHead>
-                  <TableHead className="text-right w-[15%]">{t("qty")}</TableHead>
-                  <TableHead className="text-right w-[15%] hidden sm:table-cell">{t("price")}</TableHead>
-                  <TableHead className="text-right w-[15%] hidden sm:table-cell">{t("discount")}</TableHead>
-                  <TableHead className="text-right w-[15%]">{t("total")}</TableHead>
+                  <TableHead className="w-[30%]">{t("product")}</TableHead>
+                  <TableHead className="w-[12%] hidden sm:table-cell">{t("unit")}</TableHead>
+                  <TableHead className="text-right w-[13%]">{t("qty")}</TableHead>
+                  <TableHead className="text-right w-[13%] hidden sm:table-cell">{t("price")}</TableHead>
+                  <TableHead className="text-right w-[13%] hidden sm:table-cell">{t("discount")}</TableHead>
+                  <TableHead className="text-right w-[13%]">{t("total")}</TableHead>
                   <TableHead className="w-[40px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -351,8 +393,25 @@ export function PosPage() {
                 ) : (
                   cart.map((item) => (
                     <TableRow key={item.productId}>
-                      <TableCell className="font-medium truncate max-w-[200px]">
+                      <TableCell className="font-medium truncate max-w-[160px]">
                         {item.productName}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {item.units.length > 0 ? (
+                          <select
+                            value={item.productUnitId || ""}
+                            onChange={(e) => changeUnit(item.productId, e.target.value)}
+                            className="h-9 text-xs rounded-md border border-input bg-transparent px-2"
+                          >
+                            {item.units.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{item.unitName}</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">

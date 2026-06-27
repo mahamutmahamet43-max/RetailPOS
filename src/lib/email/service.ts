@@ -163,6 +163,36 @@ export async function sendLowStockEmail(
   })
 }
 
+export async function sendPasswordResetEmail(
+  to: string,
+  name: string,
+  resetUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  return sendTemplateEmail({
+    to,
+    templateName: "password-reset",
+    vars: {
+      name: escapeHtml(name),
+      resetUrl,
+    },
+  })
+}
+
+export async function sendVerifyEmailEmail(
+  to: string,
+  name: string,
+  verificationUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  return sendTemplateEmail({
+    to,
+    templateName: "verify-email",
+    vars: {
+      name: escapeHtml(name),
+      verificationUrl,
+    },
+  })
+}
+
 export async function sendBackupCompleteEmail(
   to: string,
   name: string,

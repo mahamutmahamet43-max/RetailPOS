@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
+import { requireRole } from "@/lib/role"
+import { validateOrError, productUpdateSchema } from "@/lib/api-validation"
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -20,7 +19,7 @@ export async function GET(
 
     const product = await prisma.product.findFirst({
       where: { id, storeId: store.id },
-      include: { category: true },
+      include: { category: true, units: true },
     })
 
     if (!product) {
@@ -45,10 +44,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -66,48 +63,13 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const {
-      barcode,
-      sku,
-      name,
-      description,
-      image,
-      costPrice,
-      sellingPrice,
-      stockQuantity,
-      minimumStock,
-      brand,
-      unit,
-      isActive,
-      categoryId,
-      manufacturer,
-      genericName,
-      dosage,
-      strength,
-      form,
-      prescriptionRequired,
-      medicineCategory,
-    } = body
+    const validation = validateOrError(productUpdateSchema, body)
+    if (!validation.success) return validation.response
+    const data = validation.data
 
-    if (name !== undefined) {
-      if (typeof name !== "string" || !name.trim()) {
-        return NextResponse.json(
-          { error: "Product name is required" },
-          { status: 400 }
-        )
-      }
-    }
-
-    if (sellingPrice !== undefined && Number(sellingPrice) <= 0) {
-      return NextResponse.json(
-        { error: "Selling price must be greater than 0" },
-        { status: 400 }
-      )
-    }
-
-    if (categoryId) {
+    if (data.categoryId) {
       const category = await prisma.category.findFirst({
-        where: { id: categoryId, storeId: store.id },
+        where: { id: data.categoryId, storeId: store.id },
       })
 
       if (!category) {
@@ -118,10 +80,10 @@ export async function PATCH(
       }
     }
 
-    if (barcode) {
+    if (data.barcode) {
       const duplicate = await prisma.product.findFirst({
         where: {
-          barcode,
+          barcode: data.barcode,
           storeId: store.id,
           id: { not: id },
         },
@@ -138,26 +100,19 @@ export async function PATCH(
     const product = await prisma.product.update({
       where: { id },
       data: {
-        ...(name !== undefined && { name: name.trim() }),
-        ...(barcode !== undefined && { barcode: barcode || null }),
-        ...(sku !== undefined && { sku: sku || null }),
-        ...(description !== undefined && { description: description || null }),
-        ...(image !== undefined && { image: image || null }),
-        ...(costPrice !== undefined && { costPrice: costPrice !== null ? Number(costPrice) : null }),
-        ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
-        ...(stockQuantity !== undefined && { stockQuantity: Number(stockQuantity) }),
-        ...(minimumStock !== undefined && { minimumStock: Number(minimumStock) }),
-        ...(brand !== undefined && { brand: brand || null }),
-        ...(unit !== undefined && { unit: unit || null }),
-        ...(isActive !== undefined && { isActive }),
-        ...(categoryId !== undefined && { categoryId }),
-        ...(manufacturer !== undefined && { manufacturer: manufacturer || null }),
-        ...(genericName !== undefined && { genericName: genericName || null }),
-        ...(dosage !== undefined && { dosage: dosage || null }),
-        ...(strength !== undefined && { strength: strength || null }),
-        ...(form !== undefined && { form: form || null }),
-        ...(prescriptionRequired !== undefined && { prescriptionRequired }),
-        ...(medicineCategory !== undefined && { medicineCategory: medicineCategory || null }),
+        ...(data.name !== undefined && { name: data.name.trim() }),
+        ...(data.barcode !== undefined && { barcode: data.barcode || null }),
+        ...(data.sku !== undefined && { sku: data.sku || null }),
+        ...(data.description !== undefined && { description: data.description || null }),
+        ...(data.imageUrl !== undefined && { image: data.imageUrl || null }),
+        ...(data.costPrice !== undefined && { costPrice: data.costPrice }),
+        ...(data.sellingPrice !== undefined && { sellingPrice: data.sellingPrice }),
+        ...(data.stockQuantity !== undefined && { stockQuantity: data.stockQuantity }),
+        ...(data.minimumStock !== undefined && { minimumStock: data.minimumStock }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+        ...(data.isPharmacyItem !== undefined && { isPharmacyItem: data.isPharmacyItem }),
+        ...(data.requiresPrescription !== undefined && { requiresPrescription: data.requiresPrescription }),
       },
       include: { category: true },
     })
@@ -177,10 +132,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()

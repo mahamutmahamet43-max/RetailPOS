@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { validateOrError, inventorySchema } from "@/lib/api-validation"
 import { sendLowStockEmail } from "@/lib/email/service"
+import { requireRole } from "@/lib/role"
 
 export async function GET(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -83,10 +81,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -141,7 +137,7 @@ export async function POST(request: Request) {
           reference: notes?.trim() || null,
           storeId: store.id,
           productId,
-          createdBy: session.user.id,
+          createdBy: auth.userId,
         },
         include: {
           product: { select: { id: true, name: true, sku: true } },
@@ -156,8 +152,11 @@ export async function POST(request: Request) {
 
     logger.inventoryUpdated(productId, transactionType, quantity)
 
-    if (newQuantity <= product.minimumStock && session.user.email) {
-      sendLowStockEmail(session.user.email, session.user.name || "Store Owner", store.name || "Store", product.name, newQuantity, product.minimumStock).catch(() => {})
+    if (newQuantity <= product.minimumStock) {
+      const user = await prisma.user.findUnique({ where: { id: auth.userId }, select: { email: true, name: true } })
+      if (user?.email) {
+        sendLowStockEmail(user.email, user.name || "Store Owner", store.name || "Store", product.name, newQuantity, product.minimumStock).catch(() => {})
+      }
     }
 
     return NextResponse.json(transaction, { status: 201 })

@@ -8,6 +8,8 @@ import {
   Package,
   Users,
   UserCircle,
+  ShoppingCart,
+  Building2,
 } from "lucide-react"
 import { Loader2 } from "lucide-react"
 
@@ -26,11 +28,19 @@ const CustomersTab = React.lazy(() =>
 const CashiersTab = React.lazy(() =>
   import("./cashiers-tab").then((m) => ({ default: m.CashiersTab }))
 )
+const PurchasesTab = React.lazy(() =>
+  import("./purchases-tab").then((m) => ({ default: m.PurchasesTab }))
+)
+const SuppliersTab = React.lazy(() =>
+  import("./suppliers-tab").then((m) => ({ default: m.SuppliersTab }))
+)
 
 const TABS = [
   { id: "overview", label: "overview", icon: BarChart3, Component: OverviewTab },
   { id: "sales", label: "sales", icon: TrendingUp, Component: SalesTab },
   { id: "inventory", label: "inventory", icon: Package, Component: InventoryTab },
+  { id: "purchases", label: "purchases", icon: ShoppingCart, Component: PurchasesTab },
+  { id: "suppliers", label: "suppliers", icon: Building2, Component: SuppliersTab },
   { id: "customers", label: "customers", icon: Users, Component: CustomersTab },
   { id: "cashiers", label: "cashiers", icon: UserCircle, Component: CashiersTab },
 ] as const

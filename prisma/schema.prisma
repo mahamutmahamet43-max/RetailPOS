@@ -37,12 +37,13 @@ model Store {
   customers             Customer[]
   inventoryTransactions InventoryTransaction[]
   products              Product[]
+  purchases             Purchase[]
   sales                 Sale[]
   suppliers             Supplier[]
-  purchases             Purchase[]
   owner                 User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   subscription          Subscription?
   settings              StoreSetting?
+  backups               Backup[]
 }
 
 model Subscription {
@@ -134,19 +135,14 @@ model Product {
   brand                 String?
   unit                  String?
   isActive              Boolean                @default(true)
-  manufacturer          String?
-  genericName           String?
-  dosage                String?
-  strength              String?
-  form                  String?
-  prescriptionRequired  Boolean                @default(false)
-  medicineCategory      String?
+  isPharmacyItem        Boolean                @default(false)
+  requiresPrescription  Boolean                @default(false)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   storeId               String
   categoryId            String
   inventoryTransactions InventoryTransaction[]
-  batches               MedicineBatch[]
+  units                 ProductUnit[]
   category              Category               @relation(fields: [categoryId], references: [id])
   store                 Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -175,7 +171,6 @@ model Customer {
   storeId        String
   store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   sales          Sale[]
-  prescriptions  Prescription[]
 
   @@unique([storeId, customerCode])
   @@unique([storeId, phone])
@@ -191,7 +186,6 @@ model InventoryTransaction {
   newStock         Int
   reason           String
   reference        String?
-  adjustmentReason AdjustmentReason?
   createdAt        DateTime         @default(now())
   storeId          String
   productId        String
@@ -204,6 +198,7 @@ model InventoryTransaction {
 
   @@index([storeId, createdAt])
   @@index([productId])
+  @@index([purchaseId])
 }
 
 model Sale {
@@ -225,7 +220,6 @@ model Sale {
   customer      Customer?     @relation(fields: [customerId], references: [id])
   store         Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
   items         SaleItem[]
-  prescriptions Prescription[]
 
   @@unique([storeId, saleNumber])
   @@index([storeId, createdAt])
@@ -235,17 +229,22 @@ model Sale {
 }
 
 model SaleItem {
-  id          String  @id @default(cuid())
-  productId   String
-  productName String
-  barcode     String?
-  quantity    Int
-  unitPrice   Float
-  costPrice   Float?
-  discount    Float   @default(0)
-  total       Float
-  saleId      String
-  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  id                   String       @id @default(cuid())
+  productId            String
+  productName          String
+  barcode              String?
+  quantity             Int
+  unitPrice            Float
+  costPrice            Float?
+  discount             Float        @default(0)
+  total                Float
+  productUnitId        String?
+  unitName             String       @default("pcs")
+  unitConversionFactor Float        @default(1)
+  returnedQuantity     Int          @default(0)
+  saleId               String
+  sale                 Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productUnit          ProductUnit? @relation(fields: [productUnitId], references: [id])
 
   @@index([saleId])
   @@index([productId])
@@ -285,24 +284,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model MedicineBatch {
-  id           String   @id @default(cuid())
-  productId    String
-  batchNumber  String
-  expiryDate   DateTime
-  purchasePrice Float?
-  sellingPrice Float?
-  quantity     Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  purchaseItem PurchaseItem?
-
-  @@unique([productId, batchNumber])
-  @@index([productId])
-  @@index([expiryDate])
-}
-
 model Supplier {
   id        String   @id @default(cuid())
   storeId   String
@@ -320,55 +301,61 @@ model Supplier {
 }
 
 model Purchase {
-  id              String          @id @default(cuid())
-  purchaseNumber  String
-  supplierId      String?
-  supplierName    String
-  notes           String?
-  totalAmount     Float
-  status          PurchaseStatus  @default(PENDING)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  storeId         String
-  supplier        Supplier?       @relation(fields: [supplierId], references: [id])
-  store           Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  items           PurchaseItem[]
-  transactions    InventoryTransaction[]
+  id            String          @id @default(cuid())
+  invoiceNumber String
+  supplierId    String?
+  supplierName  String
+  notes         String?
+  total         Float
+  status        PurchaseStatus  @default(PENDING)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  storeId       String
+  supplier      Supplier?       @relation(fields: [supplierId], references: [id])
+  store         Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items         PurchaseItem[]
+  transactions  InventoryTransaction[]
 
-  @@unique([storeId, purchaseNumber])
+  @@unique([storeId, invoiceNumber])
   @@index([storeId, createdAt])
 }
 
 model PurchaseItem {
-  id              String        @id @default(cuid())
-  purchaseId      String
-  productId       String
-  productName     String
-  quantity        Int
-  unitCost        Float
-  totalCost       Float
-  batchId         String?        @unique
-  batch           MedicineBatch? @relation(fields: [batchId], references: [id])
-  purchase        Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  id                    String       @id @default(cuid())
+  purchaseId            String
+  productId             String
+  productName           String
+  productUnitId         String?
+  unitName              String       @default("pcs")
+  unitConversionFactor  Float        @default(1)
+  quantity              Int
+  costPrice             Float
+  purchase              Purchase     @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productUnit           ProductUnit? @relation(fields: [productUnitId], references: [id])
 
   @@index([purchaseId])
   @@index([productId])
+  @@index([productUnitId])
 }
 
-model Prescription {
-  id                 String   @id @default(cuid())
-  customerId         String
-  saleId             String?
-  doctorName         String?
-  prescriptionNumber String?
-  notes              String?
-  createdAt          DateTime @default(now())
-  customer           Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  sale               Sale?    @relation(fields: [saleId], references: [id])
+model ProductUnit {
+  id                String         @id @default(cuid())
+  productId         String
+  name              String
+  conversionFactor  Decimal
+  sellingPrice      Decimal?
+  barcode           String?
+  isBaseUnit        Boolean        @default(false)
+  isDefaultSaleUnit Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  product           Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchaseItems     PurchaseItem[]
+  saleItems         SaleItem[]
 
-  @@index([customerId])
-  @@index([saleId])
-  @@index([createdAt])
+  @@unique([productId, name])
+  @@unique([productId, barcode])
+  @@index([productId])
 }
 
 enum SubscriptionPlan {
@@ -431,20 +418,13 @@ enum PaymentMethod {
 enum SaleStatus {
   COMPLETED
   VOID
+  REFUNDED
 }
 
 enum PurchaseStatus {
   PENDING
   COMPLETED
   CANCELLED
-}
-
-enum AdjustmentReason {
-  DAMAGED
-  EXPIRED
-  STOLEN
-  LOST
-  CORRECTION
 }
 
 model EmailLog {
@@ -462,5 +442,19 @@ model EmailLog {
   updatedAt    DateTime  @updatedAt
 
   @@index([status])
+  @@index([createdAt])
+}
+
+model Backup {
+  id        String   @id @default(cuid())
+  storeId   String
+  filename  String
+  data      String
+  size      String
+  status    String   @default("completed")
+  createdAt DateTime @default(now())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
   @@index([createdAt])
 }

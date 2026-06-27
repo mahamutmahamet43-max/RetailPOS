@@ -38,13 +38,8 @@ export const productSchema = z.object({
   description: z.string().optional().nullable(),
   imageUrl: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
-  manufacturer: z.string().optional().nullable(),
-  genericName: z.string().optional().nullable(),
-  dosage: z.string().optional().nullable(),
-  strength: z.string().optional().nullable(),
-  form: z.string().optional().nullable(),
-  prescriptionRequired: z.boolean().optional().default(false),
-  medicineCategory: z.string().optional().nullable(),
+  isPharmacyItem: z.boolean().optional().default(false),
+  requiresPrescription: z.boolean().optional().default(false),
 })
 
 export const categorySchema = z.object({
@@ -71,6 +66,9 @@ export const saleItemSchema = z.object({
   quantity: z.number().int().positive("Quantity must be positive"),
   unitPrice: z.number().positive("Unit price must be positive"),
   discount: z.number().min(0).default(0),
+  productUnitId: z.string().optional().nullable(),
+  unitName: z.string().default("pcs"),
+  unitConversionFactor: z.number().positive().default(1),
 })
 
 export const saleSchema = z.object({
@@ -116,6 +114,41 @@ export const billingRenewSchema = z.object({
   paymentReference: z.string().optional(),
   customerPhone: z.string().optional(),
   customerEmail: z.string().email().optional().or(z.literal("")),
+})
+
+export const supplierSchema = z.object({
+  name: z.string().min(1, "Supplier name is required"),
+  phone: z.string().optional().nullable(),
+  email: z.string().email("Invalid email").optional().nullable().or(z.literal("")),
+  address: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
+
+export const purchaseItemSchema = z.object({
+  productId: z.string().min(1, "Product is required"),
+  productName: z.string().min(1),
+  productUnitId: z.string().optional().nullable(),
+  unitName: z.string().default("pcs"),
+  unitConversionFactor: z.number().positive("Conversion factor must be positive").default(1),
+  quantity: z.number().int().positive("Quantity must be positive"),
+  costPrice: z.number().min(0, "Cost price must be non-negative"),
+})
+
+export const purchaseSchema = z.object({
+  invoiceNumber: z.string().min(1, "Invoice number is required"),
+  supplierId: z.string().optional().nullable(),
+  supplierName: z.string().min(1, "Supplier name is required"),
+  notes: z.string().optional().nullable(),
+  status: z.enum(["PENDING", "COMPLETED"]).default("PENDING"),
+  items: z.array(purchaseItemSchema).min(1, "At least one item is required"),
+})
+
+export const productUpdateSchema = productSchema.partial()
+export const categoryUpdateSchema = categorySchema.partial()
+export const customerUpdateSchema = customerSchema.partial()
+export const supplierUpdateSchema = supplierSchema.partial()
+export const saleActionSchema = z.object({
+  action: z.literal("void"),
 })
 
 export function successResponse<T>(data: T, status = 200): NextResponse {

@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
+import { requireRole } from "@/lib/role"
+import { validateOrError, categoryUpdateSchema } from "@/lib/api-validation"
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -30,20 +29,15 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, description, color, icon, isActive } = body
+    const validation = validateOrError(categoryUpdateSchema, body)
+    if (!validation.success) return validation.response
+    const data = validation.data
 
-    if (name !== undefined) {
-      if (typeof name !== "string" || !name.trim()) {
-        return NextResponse.json(
-          { error: "Name is required" },
-          { status: 400 }
-        )
-      }
-
+    if (data.name !== undefined) {
       const duplicate = await prisma.category.findFirst({
         where: {
           storeId: store.id,
-          name: name.trim(),
+          name: data.name.trim(),
           id: { not: id },
         },
       })
@@ -59,11 +53,10 @@ export async function PATCH(
     const category = await prisma.category.update({
       where: { id },
       data: {
-        ...(name !== undefined && { name: name.trim() }),
-        ...(description !== undefined && { description: description || null }),
-        ...(color !== undefined && { color: color || null }),
-        ...(icon !== undefined && { icon: icon || null }),
-        ...(isActive !== undefined && { isActive }),
+        ...(data.name !== undefined && { name: data.name.trim() }),
+        ...(data.description !== undefined && { description: data.description || null }),
+        ...(data.color !== undefined && { color: data.color || null }),
+        ...(data.icon !== undefined && { icon: data.icon || null }),
       },
     })
 
@@ -82,10 +75,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()

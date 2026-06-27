@@ -9,9 +9,6 @@ import {
   ShoppingCart,
   TrendingUp,
   AlertTriangle,
-  Pill,
-  FlaskConical,
-  CalendarRange,
 } from "lucide-react"
 import {
   Card,
@@ -40,16 +37,6 @@ interface DashboardData {
   outOfStockProducts: number
 }
 
-interface PharmacyDashboardData {
-  totalMedicines: number
-  lowStockMedicines: number
-  outOfStockMedicines: number
-  expiredBatches: number
-  expiringSoonBatches: number
-  expiring90Batches: number
-  todayPurchases: { count: number; total: number }
-}
-
 interface ChartData {
   sevenDays: { date: string; total: number }[]
   thirtyDays: { date: string; total: number }[]
@@ -71,28 +58,22 @@ export function DashboardPage() {
   const [chartData, setChartData] = React.useState<ChartData | null>(null)
   const [bestSelling, setBestSelling] = React.useState<BestSelling | null>(null)
   const [paymentMethods, setPaymentMethods] = React.useState<PaymentMethods | null>(null)
-  const [pharmacyData, setPharmacyData] = React.useState<PharmacyDashboardData | null>(null)
-
   React.useEffect(() => {
     fetch("/api/reports/dashboard")
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : null)
       .then(setData)
       .catch(() => {})
     fetch("/api/reports/sales-chart")
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : null)
       .then(setChartData)
       .catch(() => {})
     fetch("/api/reports/best-selling")
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : null)
       .then(setBestSelling)
       .catch(() => {})
     fetch("/api/reports/payment-methods")
-      .then((r) => r.json())
-      .then(setPaymentMethods)
-      .catch(() => {})
-    fetch("/api/pharmacy/dashboard")
       .then((r) => r.ok ? r.json() : null)
-      .then(setPharmacyData)
+      .then(setPaymentMethods)
       .catch(() => {})
   }, [])
 
@@ -189,85 +170,6 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {pharmacyData && (
-        <>
-          <div className="pt-2 pb-1">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Pill className="h-5 w-5 text-primary" />
-              Pharmacy Overview
-            </h2>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-medium">Medicines</CardTitle>
-                <Pill className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">{pharmacyData.totalMedicines}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-medium">Low Stock</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold text-amber-500">{pharmacyData.lowStockMedicines}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-medium">Expired Batches</CardTitle>
-                <CalendarRange className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold text-red-500">{pharmacyData.expiredBatches}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-medium">Expiring ≤30d</CardTitle>
-                <FlaskConical className="h-4 w-4 text-orange-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold text-orange-500">{pharmacyData.expiringSoonBatches}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-medium">Expiring 31-90d</CardTitle>
-                <FlaskConical className="h-4 w-4 text-amber-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold text-amber-500">{pharmacyData.expiring90Batches}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-medium">Today Purchases</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">{pharmacyData.todayPurchases.count}</div>
-                <div className="text-xs text-muted-foreground">
-                  ${(pharmacyData.todayPurchases.total ?? 0).toFixed(2)}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-medium">Out of Stock</CardTitle>
-                <Package className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold text-red-500">{pharmacyData.outOfStockMedicines}</div>
-              </CardContent>
-            </Card>
-          </div>
-        </>
-      )}
 
       <React.Suspense
         fallback={

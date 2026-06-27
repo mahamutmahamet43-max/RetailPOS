@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
@@ -8,13 +7,12 @@ import { validateOrError, saleSchema } from "@/lib/api-validation"
 import { sendInvoiceEmail } from "@/lib/email/service"
 import { getStoreSubscription, isSubscriptionActive } from "@/lib/subscription/enforce"
 import { getPlanConfig } from "@/lib/subscription/plans"
+import { requireRole } from "@/lib/role"
 
 export async function GET(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -87,10 +85,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -99,6 +95,20 @@ export async function POST(request: Request) {
     if (!validation.success) return validation.response
 
     const { items, customerId, paymentMethod, amountPaid, discount, tax } = validation.data
+
+    for (const item of items) {
+      if (item.productUnitId) {
+        const productUnit = await prisma.productUnit.findFirst({
+          where: { id: item.productUnitId, productId: item.productId },
+        })
+        if (!productUnit) {
+          return NextResponse.json(
+            { error: `Unit not found for product: ${item.productName}` },
+            { status: 404 }
+          )
+        }
+      }
+    }
 
     const paid = amountPaid || 0
 
@@ -205,7 +215,7 @@ export async function POST(request: Request) {
           status: "COMPLETED",
           storeId: store.id,
           customerId: customerId || null,
-          cashierId: session.user.id,
+          cashierId: auth.userId,
           items: {
             create: items.map((item) => {
               const product = productMap.get(item.productId)!
@@ -219,6 +229,9 @@ export async function POST(request: Request) {
                 costPrice: product.costPrice,
                 discount: item.discount,
                 total: itemTotal,
+                productUnitId: item.productUnitId || null,
+                unitName: item.unitName,
+                unitConversionFactor: item.unitConversionFactor,
               }
             }),
           },
@@ -227,39 +240,10 @@ export async function POST(request: Request) {
 
       saleId = createdSale.id
 
-      const storeSetting = await tx.storeSetting.findUnique({
-        where: { storeId: store.id },
-        select: { enablePharmacyModule: true },
-      })
-      const pharmacyEnabled = storeSetting?.enablePharmacyModule ?? false
-
       for (const item of items) {
         const product = productMap.get(item.productId)!
-        let newStock = product.stockQuantity - item.quantity
-
-        if (pharmacyEnabled && product.form) {
-          const fefoBatches = await tx.medicineBatch.findMany({
-            where: {
-              productId: item.productId,
-              quantity: { gt: 0 },
-              expiryDate: { gt: new Date() },
-            },
-            orderBy: { expiryDate: "asc" },
-          })
-          let remaining = item.quantity
-          for (const batch of fefoBatches) {
-            if (remaining <= 0) break
-            const take = Math.min(remaining, batch.quantity)
-            await tx.medicineBatch.update({
-              where: { id: batch.id },
-              data: { quantity: batch.quantity - take },
-            })
-            remaining -= take
-          }
-          if (remaining > 0) {
-            logger.warn(`Insufficient batch stock for ${product.name}, ${remaining} units deducted from main stock only`)
-          }
-        }
+        const baseQuantity = Math.round(item.quantity * item.unitConversionFactor)
+        let newStock = product.stockQuantity - baseQuantity
 
         await tx.product.update({
           where: { id: item.productId },
@@ -269,13 +253,13 @@ export async function POST(request: Request) {
         await tx.inventoryTransaction.create({
           data: {
             transactionType: "OUT",
-            quantity: item.quantity,
+            quantity: baseQuantity,
             previousStock: product.stockQuantity,
             newStock,
             reason: `Sale #${saleNumber}`,
             storeId: store.id,
             productId: item.productId,
-            createdBy: session.user.id,
+            createdBy: auth.userId,
           },
         })
       }
@@ -283,11 +267,11 @@ export async function POST(request: Request) {
 
     const sale = await prisma.sale.findUnique({
       where: { id: saleId },
-      include: {
-        items: true,
-        customer: { select: { id: true, firstName: true, lastName: true, email: true } },
-        cashier: { select: { id: true, name: true } },
-      },
+        include: {
+          items: { include: { productUnit: { select: { id: true, name: true } } } },
+          customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+          cashier: { select: { id: true, name: true } },
+        },
     })
 
     if (sale?.customer?.email) {

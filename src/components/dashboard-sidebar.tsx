@@ -13,12 +13,8 @@ import {
   BarChart3,
   Settings,
   Store,
-  Pill,
-  FlaskConical,
   Truck,
   ClipboardList,
-  AlertTriangle,
-  Syringe,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -26,35 +22,18 @@ const sidebarItems = [
   { href: "/dashboard", label: "dashboard", icon: LayoutDashboard },
   { href: "/dashboard/products", label: "products", icon: Package },
   { href: "/dashboard/categories", label: "categories", icon: Tags },
+  { href: "/dashboard/suppliers", label: "suppliers", icon: Truck },
+  { href: "/dashboard/purchases", label: "purchases", icon: ClipboardList },
   { href: "/dashboard/customers", label: "customers", icon: Users },
   { href: "/dashboard/sales", label: "sales", icon: ShoppingCart },
   { href: "/dashboard/reports", label: "reports", icon: BarChart3 },
   { href: "/dashboard/settings", label: "settings", icon: Settings },
 ] as const
 
-const pharmacyItems = [
-  { href: "/dashboard/pharmacy/medicines", label: "Medicines", icon: Pill },
-  { href: "/dashboard/pharmacy/batches", label: "Batches", icon: FlaskConical },
-  { href: "/dashboard/pharmacy/suppliers", label: "Suppliers", icon: Truck },
-  { href: "/dashboard/pharmacy/purchases", label: "Purchases", icon: ClipboardList },
-  { href: "/dashboard/pharmacy/reports", label: "Pharmacy Reports", icon: BarChart3 },
-  { href: "/dashboard/pharmacy/adjustments", label: "Adjustments", icon: AlertTriangle },
-  { href: "/dashboard/pharmacy/prescriptions", label: "Prescriptions", icon: Syringe },
-] as const
-
 export function DashboardSidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const t = useTranslations("nav")
   const locale = pathname.split("/")[1] || "en"
-  const [pharmacyEnabled, setPharmacyEnabled] = React.useState(false)
-
-  React.useEffect(() => {
-    fetch("/api/pharmacy/settings")
-      .then((r) => r.json())
-      .then((d) => setPharmacyEnabled(d.enabled))
-      .catch(() => {})
-  }, [])
-
   const items = sidebarItems
 
   function NavLink({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) {
@@ -92,16 +71,6 @@ export function DashboardSidebar({ className }: { className?: string }) {
             <NavLink key={item.href} href={item.href} icon={item.icon} label={t(item.label)} />
           ))}
 
-          {pharmacyEnabled && (
-            <>
-              <div className="mt-4 mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Pharmacy
-              </div>
-              {pharmacyItems.map((item) => (
-                <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} />
-              ))}
-            </>
-          )}
         </nav>
       </div>
     </aside>

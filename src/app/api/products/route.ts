@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { validateOrError, productSchema } from "@/lib/api-validation"
 import { enforceLimit } from "@/lib/subscription/enforce"
+import { requireRole } from "@/lib/role"
 
 export async function GET(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -30,7 +28,6 @@ export async function GET(request: Request) {
               { barcode: { contains: search, mode: "insensitive" as const } },
               { sku: { contains: search, mode: "insensitive" as const } },
               { brand: { contains: search, mode: "insensitive" as const } },
-              { genericName: { contains: search, mode: "insensitive" as const } },
             ],
           }
         : {}),
@@ -39,7 +36,7 @@ export async function GET(request: Request) {
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
-        include: { category: { select: { id: true, name: true } } },
+        include: { category: { select: { id: true, name: true } }, units: true },
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
@@ -65,10 +62,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -120,13 +115,8 @@ export async function POST(request: Request) {
         isActive: data.isActive,
         storeId: store.id,
         categoryId: data.categoryId,
-        manufacturer: data.manufacturer || null,
-        genericName: data.genericName || null,
-        dosage: data.dosage || null,
-        strength: data.strength || null,
-        form: data.form || null,
-        prescriptionRequired: data.prescriptionRequired ?? false,
-        medicineCategory: data.medicineCategory || null,
+        isPharmacyItem: data.isPharmacyItem ?? false,
+        requiresPrescription: data.requiresPrescription ?? false,
       },
       include: { category: { select: { id: true, name: true } } },
     })

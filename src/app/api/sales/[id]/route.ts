@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
+import { requireRole } from "@/lib/role"
+import { validateOrError, saleActionSchema } from "@/lib/api-validation"
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
@@ -48,22 +47,16 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const auth = await requireRole("OWNER", "MANAGER")
+    if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
     if (!store) return noStoreResponse()
     const { id } = await params
     const body = await request.json()
 
-    if (body.action !== "void") {
-      return NextResponse.json(
-        { error: "Invalid action" },
-        { status: 400 }
-      )
-    }
+    const validation = validateOrError(saleActionSchema, body)
+    if (!validation.success) return validation.response
 
     const sale = await prisma.sale.findFirst({
       where: { id, storeId: store.id },
@@ -74,9 +67,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Sale not found" }, { status: 404 })
     }
 
-    if (sale.status === "VOID") {
+    if (sale.status === "VOID" || sale.status === "REFUNDED") {
       return NextResponse.json(
-        { error: "Sale is already voided" },
+        { error: "Sale cannot be voided" },
         { status: 400 }
       )
     }
@@ -116,7 +109,7 @@ export async function PATCH(
               reason: `Void sale #${sale.saleNumber}`,
               storeId: store.id,
               productId: item.productId,
-              createdBy: session.user.id,
+              createdBy: auth.userId,
             },
           })
         }

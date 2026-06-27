@@ -134,12 +134,6 @@ export default function SettingsPage() {
         }
       } catch {}
       try {
-        fetch("/api/pharmacy/settings")
-          .then((r) => r.json())
-          .then((d) => setEnablePharmacyModule(d.enabled === true))
-          .catch(() => {})
-      } catch {}
-      try {
         const res = await fetch("/api/settings/sessions")
         if (res.ok) {
           const data = await res.json()
@@ -383,12 +377,7 @@ export default function SettingsPage() {
                 </div>
                 <Switch
                   checked={enablePharmacyModule}
-                  onCheckedChange={async (checked) => {
-                    setEnablePharmacyModule(checked)
-                    try {
-                      await fetch("/api/pharmacy/settings", { method: "PUT" })
-                    } catch {}
-                  }}
+                  onCheckedChange={setEnablePharmacyModule}
                 />
               </div>
             </CardContent>

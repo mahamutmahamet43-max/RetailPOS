@@ -46,7 +46,10 @@ export default async function middleware(req: NextRequest) {
 
   const isAuthPage =
     pathnameWithoutLocale.startsWith("/login") ||
-    pathnameWithoutLocale.startsWith("/register")
+    pathnameWithoutLocale.startsWith("/register") ||
+    pathnameWithoutLocale.startsWith("/forgot-password") ||
+    pathnameWithoutLocale.startsWith("/reset-password") ||
+    pathnameWithoutLocale.startsWith("/verify-email")
   const isDashboardPage = pathnameWithoutLocale.startsWith("/dashboard")
   const isBillingPage = pathnameWithoutLocale.startsWith("/dashboard/billing")
 

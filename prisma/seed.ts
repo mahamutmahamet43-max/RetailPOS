@@ -120,9 +120,11 @@ async function main() {
   })
 
   console.log("Seed complete!")
-  console.log("  Owner:  admin@retailpos.com / password123")
-  console.log("  Manager: manager@retailpos.com / manager123")
-  console.log("  Cashier: cashier@retailpos.com / cashier123")
+  if (process.env.NODE_ENV !== "production") {
+    console.log("  Owner:  admin@retailpos.com / password123")
+    console.log("  Manager: manager@retailpos.com / manager123")
+    console.log("  Cashier: cashier@retailpos.com / cashier123")
+  }
 }
 
 main()

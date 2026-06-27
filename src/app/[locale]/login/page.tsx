@@ -99,6 +99,15 @@ export default function LoginPage() {
                 <p className="text-sm text-destructive">{error}</p>
               )}
 
+              <div className="flex items-center justify-end">
+                <Link
+                  href={`/${locale}/forgot-password`}
+                  className="text-sm text-muted-foreground underline underline-offset-4 hover:text-primary"
+                >
+                  {t("forgotPassword")}
+                </Link>
+              </div>
+
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? t("signingIn") : t("signIn")}
               </Button>

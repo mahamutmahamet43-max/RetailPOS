@@ -10,7 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ShoppingCart,
+  RotateCcw,
+  Minus,
+  Plus,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -52,6 +56,7 @@ interface SaleItem {
   unitPrice: number
   discount: number
   total: number
+  returnedQuantity: number
 }
 
 interface SaleCustomer {
@@ -108,6 +113,10 @@ export function SalesHistory() {
   const [voidDialogOpen, setVoidDialogOpen] = React.useState(false)
   const [voiding, setVoiding] = React.useState(false)
   const [voidError, setVoidError] = React.useState("")
+  const [refundOpen, setRefundOpen] = React.useState(false)
+  const [refunding, setRefunding] = React.useState(false)
+  const [refundQuantities, setRefundQuantities] = React.useState<Record<string, number>>({})
+  const [refundError, setRefundError] = React.useState("")
 
   const fetchSales = React.useCallback(async () => {
     setLoading(true)
@@ -171,6 +180,7 @@ export function SalesHistory() {
       const updated: Sale = await res.json()
       setSelectedSale(updated)
       setVoidDialogOpen(false)
+      toast.success(t("voidSuccess"))
       fetchSales()
     } catch {
       setVoidError(common("error"))
@@ -294,6 +304,8 @@ export function SalesHistory() {
                   <TableCell>
                     {sale.status === "VOID" ? (
                       <Badge variant="destructive">{t("voided")}</Badge>
+                    ) : sale.status === "REFUNDED" ? (
+                      <Badge variant="secondary">{t("refunded")}</Badge>
                     ) : (
                       <Badge variant="success">{t("completed")}</Badge>
                     )}
@@ -375,6 +387,8 @@ export function SalesHistory() {
                 </span>
                 {selectedSale.status === "VOID" ? (
                   <Badge variant="destructive">{t("voided")}</Badge>
+                ) : selectedSale.status === "REFUNDED" ? (
+                  <Badge variant="secondary">{t("refunded")}</Badge>
                 ) : (
                   <Badge variant="success">{t("completed")}</Badge>
                 )}
@@ -514,16 +528,38 @@ export function SalesHistory() {
                   <Printer className="mr-2 h-4 w-4" />
                   {t("printReceipt")}
                 </Button>
-                {selectedSale.status !== "VOID" && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setVoidDialogOpen(true)}
-                  >
-                    <Ban className="mr-2 h-4 w-4" />
-                    {t("voidSale")}
-                  </Button>
+                {selectedSale.status === "COMPLETED" && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        setRefundQuantities(
+                          Object.fromEntries(
+                            selectedSale.items.map((i) => [
+                              i.id,
+                              i.quantity - i.returnedQuantity,
+                            ])
+                          )
+                        )
+                        setRefundError("")
+                        setRefundOpen(true)
+                      }}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      {t("refund")}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setVoidDialogOpen(true)}
+                    >
+                      <Ban className="mr-2 h-4 w-4" />
+                      {t("voidSale")}
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -553,6 +589,122 @@ export function SalesHistory() {
               disabled={voiding}
             >
               {voiding ? common("loading") : t("confirmVoid")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={refundOpen} onOpenChange={setRefundOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("refundSale")}</DialogTitle>
+            <DialogDescription>{t("refundWarning")}</DialogDescription>
+          </DialogHeader>
+          {selectedSale && (
+            <div className="space-y-3 py-2">
+              {selectedSale.items.filter((i) => i.quantity - i.returnedQuantity > 0).length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("noItemsToRefund")}</p>
+              ) : (
+                selectedSale.items
+                  .filter((i) => i.quantity - i.returnedQuantity > 0)
+                  .map((item) => {
+                    const available = item.quantity - item.returnedQuantity
+                    const qty = refundQuantities[item.id] ?? available
+                    return (
+                      <div key={item.id} className="flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.productName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {t("available")}: {available} × ${item.unitPrice.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            disabled={qty <= 0}
+                            onClick={() =>
+                              setRefundQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: Math.max(0, qty - 1),
+                              }))
+                            }
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-8 text-center text-sm font-medium">{qty}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            disabled={qty >= available}
+                            onClick={() =>
+                              setRefundQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: Math.min(available, qty + 1),
+                              }))
+                            }
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })
+              )}
+            </div>
+          )}
+          {refundError && (
+            <p className="text-sm text-destructive">{refundError}</p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRefundOpen(false)}
+            >
+              {common("cancel")}
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!selectedSale) return
+                const items = Object.entries(refundQuantities)
+                  .filter(([_, qty]) => qty > 0)
+                  .map(([itemId, quantity]) => ({ itemId, quantity }))
+                if (items.length === 0) {
+                  setRefundError("Select at least one item")
+                  return
+                }
+                setRefunding(true)
+                setRefundError("")
+                try {
+                  const res = await fetch(
+                    `/api/sales/${selectedSale.id}/refund`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ items }),
+                    }
+                  )
+                  if (!res.ok) {
+                    const data = await res.json()
+                    setRefundError(data.error || common("error"))
+                    return
+                  }
+                  const updated: Sale = await res.json()
+                  setSelectedSale(updated)
+                  setRefundOpen(false)
+                  toast.success(t("refundSuccess"))
+                  fetchSales()
+                } catch {
+                  setRefundError(common("error"))
+                } finally {
+                  setRefunding(false)
+                }
+              }}
+              disabled={refunding}
+            >
+              {refunding ? common("loading") : t("confirmRefund")}
             </Button>
           </DialogFooter>
         </DialogContent>
