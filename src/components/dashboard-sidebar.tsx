@@ -38,7 +38,9 @@ export function DashboardSidebar({ className }: { className?: string }) {
 
   function NavLink({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) {
     const fullHref = `/${locale}${href}`
-    const isActive = pathname === fullHref || pathname.startsWith(fullHref + "/")
+    const isActive = href === "/dashboard"
+      ? pathname === fullHref
+      : pathname === fullHref || pathname.startsWith(fullHref + "/")
     return (
       <Link
         href={fullHref}

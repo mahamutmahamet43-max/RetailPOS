@@ -111,6 +111,8 @@ export async function PATCH(
         ...(data.minimumStock !== undefined && { minimumStock: data.minimumStock }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
         ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+        ...(data.unit !== undefined && { unit: data.unit || null }),
+        ...(data.brand !== undefined && { brand: data.brand || null }),
         ...(data.isPharmacyItem !== undefined && { isPharmacyItem: data.isPharmacyItem }),
         ...(data.requiresPrescription !== undefined && { requiresPrescription: data.requiresPrescription }),
       },

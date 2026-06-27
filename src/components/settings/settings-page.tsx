@@ -131,6 +131,7 @@ export default function SettingsPage() {
           setEmailNotification(data.settings?.emailNotification ?? true)
           setLogoUrl(data.settings?.logoUrl || "")
           setTwoFactorEnabled(data.settings?.twoFactorEnabled ?? false)
+          setEnablePharmacyModule(data.settings?.enablePharmacyModule ?? false)
         }
       } catch {}
       try {
