@@ -19,7 +19,6 @@ const storeSettingsSchema = z.object({
   salesNotification: z.boolean().optional(),
   emailNotification: z.boolean().optional(),
   twoFactorEnabled: z.boolean().optional(),
-  enablePharmacyModule: z.boolean().optional(),
 })
 
 export async function GET() {
@@ -45,7 +44,6 @@ export async function GET() {
             salesNotification: true,
             emailNotification: true,
             twoFactorEnabled: true,
-            enablePharmacyModule: true,
           },
         },
       },
@@ -111,7 +109,7 @@ export async function PUT(request: Request) {
     }
 
     const stringFields = ["address", "phone", "email", "currency", "timezone", "dateFormat", "logoUrl"] as const
-    const boolFields = ["lowStockAlert", "salesNotification", "emailNotification", "twoFactorEnabled", "enablePharmacyModule"] as const
+    const boolFields = ["lowStockAlert", "salesNotification", "emailNotification", "twoFactorEnabled"] as const
 
     const settingsData: Record<string, unknown> = {}
     for (const field of stringFields) {
@@ -147,7 +145,6 @@ export async function PUT(request: Request) {
             salesNotification: true,
             emailNotification: true,
             twoFactorEnabled: true,
-            enablePharmacyModule: true,
           },
         },
       },
