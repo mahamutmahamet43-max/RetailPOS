@@ -257,7 +257,7 @@ export async function POST(request: Request) {
             remaining -= take
           }
           if (remaining > 0) {
-            throw new Error(`Insufficient stock for ${product.name}. Available batches exhausted.`)
+            logger.warn(`Insufficient batch stock for ${product.name}, ${remaining} units deducted from main stock only`)
           }
         }
 

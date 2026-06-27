@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma"
+import { isPharmacyEnabled } from "./store"
 
 export async function getExpiryAlerts(storeId: string, productIds: string[]) {
+  if (!(await isPharmacyEnabled(storeId))) {
+    return { expired: [], expiring30: [], expiring90: [], healthy: [] }
+  }
+
   const now = new Date()
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
   const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
@@ -25,6 +30,10 @@ export async function getExpiryAlerts(storeId: string, productIds: string[]) {
 }
 
 export async function getLowStockAlerts(storeId: string) {
+  if (!(await isPharmacyEnabled(storeId))) {
+    return { outOfStock: [], critical: [], lowStock: [] }
+  }
+
   const products = await prisma.product.findMany({
     where: { storeId, isActive: true },
     select: {

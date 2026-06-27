@@ -1,12 +1,15 @@
 import type { PrismaClient } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { isPharmacyEnabled } from "./store"
 
 type TransactionClient = Omit<
   PrismaClient,
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >
 
-export async function getFefoBatches(productId: string) {
+export async function getFefoBatches(storeId: string, productId: string) {
+  if (!(await isPharmacyEnabled(storeId))) return []
+
   return prisma.medicineBatch.findMany({
     where: {
       productId,
@@ -18,10 +21,14 @@ export async function getFefoBatches(productId: string) {
 }
 
 export async function deductFromBatches(
+  storeId: string,
   productId: string,
   totalQuantity: number,
   tx?: TransactionClient
 ) {
+  const enabled = await isPharmacyEnabled(storeId)
+  if (!enabled) return []
+
   const client = tx ?? prisma
   const batches = await client.medicineBatch.findMany({
     where: {

@@ -131,8 +131,13 @@ export default function SettingsPage() {
           setEmailNotification(data.settings?.emailNotification ?? true)
           setLogoUrl(data.settings?.logoUrl || "")
           setTwoFactorEnabled(data.settings?.twoFactorEnabled ?? false)
-          setEnablePharmacyModule(data.settings?.enablePharmacyModule ?? false)
         }
+      } catch {}
+      try {
+        fetch("/api/pharmacy/settings")
+          .then((r) => r.json())
+          .then((d) => setEnablePharmacyModule(d.enabled === true))
+          .catch(() => {})
       } catch {}
       try {
         const res = await fetch("/api/settings/sessions")
@@ -378,7 +383,12 @@ export default function SettingsPage() {
                 </div>
                 <Switch
                   checked={enablePharmacyModule}
-                  onCheckedChange={setEnablePharmacyModule}
+                  onCheckedChange={async (checked) => {
+                    setEnablePharmacyModule(checked)
+                    try {
+                      await fetch("/api/pharmacy/settings", { method: "PUT" })
+                    } catch {}
+                  }}
                 />
               </div>
             </CardContent>

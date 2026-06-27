@@ -115,7 +115,10 @@ const { searchParams } = new URL(request.url)
       totalPages: Math.ceil(totalOrders / limit),
     })
   } catch (error) {
-    if (error instanceof Error && (error.message === "No store found" || error.message === "Unauthorized")) {       return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 404 })     }     logger.error("GET /api/reports/sales error", error instanceof Error ? error : undefined)
+    if (error instanceof Error && (error.message === "No store found" || error.message === "Unauthorized")) {
+      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 404 })
+    }
+    logger.error("GET /api/reports/sales error", error instanceof Error ? error : undefined)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
