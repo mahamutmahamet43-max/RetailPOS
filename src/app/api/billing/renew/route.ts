@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import type { BillingProvider } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore } from "@/lib/store"
+import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { requireRole } from "@/lib/role"
 import { getRawPaymentProvider, PLAN_PRICING } from "@/lib/payment-providers"
 import { logger } from "@/lib/logger"
@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     if (authResult instanceof NextResponse) return authResult
 
     const store = await getCurrentStore()
+    if (!store) return noStoreResponse()
     const body = await request.json()
     const validation = validateOrError(billingRenewSchema, body)
     if (!validation.success) return validation.response

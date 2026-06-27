@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore } from "@/lib/store"
+import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { validateOrError, saleSchema } from "@/lib/api-validation"
 import { sendInvoiceEmail } from "@/lib/email/service"
@@ -17,6 +17,7 @@ export async function GET(request: Request) {
     }
 
     const store = await getCurrentStore()
+    if (!store) return noStoreResponse()
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search") || ""
     const from = searchParams.get("from") || ""
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
     }
 
     const store = await getCurrentStore()
+    if (!store) return noStoreResponse()
     const body = await request.json()
     const validation = validateOrError(saleSchema, body)
     if (!validation.success) return validation.response

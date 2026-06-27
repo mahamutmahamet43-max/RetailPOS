@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore } from "@/lib/store"
+import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { validateOrError, categorySchema } from "@/lib/api-validation"
 
@@ -13,7 +13,7 @@ export async function GET() {
     }
 
     const store = await getCurrentStore()
-
+    if (!store) return noStoreResponse()
     const categories = await prisma.category.findMany({
       where: { storeId: store.id },
       orderBy: { createdAt: "desc" },
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     }
 
     const store = await getCurrentStore()
+    if (!store) return noStoreResponse()
     const body = await request.json()
     const validation = validateOrError(categorySchema, body)
     if (!validation.success) return validation.response

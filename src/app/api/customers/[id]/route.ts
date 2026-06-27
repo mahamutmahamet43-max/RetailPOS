@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore } from "@/lib/store"
+import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
 
 export async function GET(
@@ -15,6 +15,7 @@ export async function GET(
     }
 
     const store = await getCurrentStore()
+    if (!store) return noStoreResponse()
     const { id } = await params
 
     const customer = await prisma.customer.findFirst({
@@ -49,6 +50,7 @@ export async function PATCH(
     }
 
     const store = await getCurrentStore()
+    if (!store) return noStoreResponse()
     const { id } = await params
 
     const existing = await prisma.customer.findFirst({
@@ -147,6 +149,7 @@ export async function DELETE(
     }
 
     const store = await getCurrentStore()
+    if (!store) return noStoreResponse()
     const { id } = await params
 
     const existing = await prisma.customer.findFirst({

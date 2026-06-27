@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore } from "@/lib/store"
+import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
 
 export async function GET() {
@@ -12,7 +12,7 @@ export async function GET() {
     }
 
     const store = await getCurrentStore()
-
+    if (!store) return noStoreResponse()
     const subscription = await prisma.subscription.findUnique({
       where: { storeId: store.id },
       include: {
