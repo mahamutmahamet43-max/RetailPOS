@@ -178,12 +178,18 @@ export function PosPage() {
       if (res.ok) {
         const data = await res.json()
         const product = data.products?.[0]
-        if (product && product.stockQuantity > 0) {
+        if (!product) {
+          toast.error(`No product found with barcode "${barcode.trim()}"`)
+        } else if (product.stockQuantity <= 0) {
+          toast.error(`"${product.name}" is out of stock`)
+        } else {
           addToCart(product)
         }
+      } else {
+        toast.error("Barcode lookup failed")
       }
     } catch {
-      console.error("Barcode lookup failed")
+      toast.error("Barcode lookup failed")
     }
     setBarcode("")
     if (barcodeRef.current) barcodeRef.current.focus()
