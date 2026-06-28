@@ -53,6 +53,7 @@ export interface Product {
   minimumStock: number
   brand: string | null
   unit: string | null
+  expiryDate: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string

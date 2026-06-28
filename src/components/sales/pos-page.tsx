@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
+import { toast } from "sonner"
 import {
   Search,
   ShoppingCart,
@@ -11,6 +12,7 @@ import {
   Printer,
   X,
   User,
+  Camera,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,6 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Receipt } from "@/components/sales/receipt"
 
 interface ProductUnit {
@@ -74,8 +77,10 @@ interface ProductResult {
   sku: string | null
   barcode: string | null
   unit: string | null
+  expiryDate: string | null
   sellingPrice: number
   stockQuantity: number
+  minimumStock: number
   units: ProductUnit[]
 }
 
@@ -96,6 +101,8 @@ export function PosPage() {
   const [checkingOut, setCheckingOut] = React.useState(false)
   const [error, setError] = React.useState("")
   const [lastSale, setLastSale] = React.useState<any>(null)
+  const [customerPurchases, setCustomerPurchases] = React.useState<any[]>([])
+  const [showScanner, setShowScanner] = React.useState(false)
   const [showReceipt, setShowReceipt] = React.useState(false)
   const barcodeRef = React.useRef<HTMLInputElement>(null)
   const searchRef = React.useRef<HTMLInputElement>(null)
@@ -122,6 +129,42 @@ export function PosPage() {
       .then((data) => setCustomers(data.customers || []))
       .catch(() => {})
   }, [])
+
+  React.useEffect(() => {
+    if (!selectedCustomerId) {
+      setCustomerPurchases([])
+      return
+    }
+    fetch(`/api/customers/${selectedCustomerId}`)
+      .then((r) => r.json())
+      .then((data) => setCustomerPurchases(data.sales || []))
+      .catch(() => setCustomerPurchases([]))
+  }, [selectedCustomerId])
+
+  React.useEffect(() => {
+    if (!showScanner) return
+    let scanner: any
+    import("html5-qrcode").then(({ Html5Qrcode }) => {
+      scanner = new Html5Qrcode("barcode-scanner")
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 150 } },
+        (decodedText: string) => {
+          setBarcode(decodedText)
+          scanner.stop().catch(() => {})
+          setShowScanner(false)
+          setTimeout(() => {
+            const form = document.querySelector("form")
+            if (form) form.requestSubmit()
+          }, 100)
+        },
+        () => {}
+      ).catch(() => {})
+    })
+    return () => {
+      if (scanner) scanner.stop().catch(() => {})
+    }
+  }, [showScanner])
 
   async function handleBarcodeSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -172,6 +215,16 @@ export function PosPage() {
   }
 
   function addToCart(product: ProductResult) {
+    if (product.expiryDate) {
+      const expired = new Date(product.expiryDate) < new Date(new Date().toDateString())
+      if (expired) {
+        toast.error(`"${product.name}" expired on ${new Date(product.expiryDate).toLocaleDateString()}. Cannot add to cart.`)
+        return
+      }
+    }
+    if (product.minimumStock > 0 && product.stockQuantity <= product.minimumStock) {
+      toast.warning(`"${product.name}" has only ${product.stockQuantity} in stock (min: ${product.minimumStock})`)
+    }
     const unitInfo = getDefaultUnit(product)
     setCart((prev) => {
       const existing = prev.find((i) => i.productId === product.id)
@@ -327,6 +380,9 @@ export function PosPage() {
                 className="pl-8 h-11 lg:h-9"
               />
             </div>
+            <Button type="button" variant="outline" size="icon" className="shrink-0 h-11 lg:h-9 w-11 lg:w-9" onClick={() => setShowScanner(true)}>
+              <Camera className="h-4 w-4" />
+            </Button>
           </form>
 
           <div className="relative">
@@ -350,6 +406,12 @@ export function PosPage() {
                     >
                       <div className="min-w-0 flex-1">
                         <span className="font-medium">{product.name}</span>
+                        {product.expiryDate && new Date(product.expiryDate) < new Date(new Date().toDateString()) && (
+                          <span className="ml-2 text-xs text-destructive font-semibold">EXPIRED</span>
+                        )}
+                        {product.minimumStock > 0 && product.stockQuantity <= product.minimumStock && (
+                          <span className="ml-2 text-xs text-amber-600 font-semibold">LOW STOCK</span>
+                        )}
                         {product.barcode && (
                           <span className="ml-2 text-xs text-muted-foreground font-mono">{product.barcode}</span>
                         )}
@@ -559,6 +621,17 @@ export function PosPage() {
                 ))}
               </SelectContent>
             </Select>
+            {customerPurchases.length > 0 && (
+              <div className="mt-1 text-xs text-muted-foreground max-h-24 overflow-y-auto space-y-1 border rounded p-2">
+                <p className="font-medium text-foreground">Recent Purchases</p>
+                {customerPurchases.slice(0, 5).map((s: any) => (
+                  <div key={s.id} className="flex justify-between">
+                    <span>{s.saleNumber}</span>
+                    <span>${s.total.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -652,6 +725,15 @@ export function PosPage() {
           />
         </div>
       )}
+
+      <Dialog open={showScanner} onOpenChange={setShowScanner}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scan Barcode</DialogTitle>
+          </DialogHeader>
+          <div id="barcode-scanner" className="w-full aspect-video bg-muted rounded-lg overflow-hidden" />
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

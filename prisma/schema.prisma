@@ -135,6 +135,7 @@ model Product {
   brand                 String?
   unit                  String?
   isActive              Boolean                @default(true)
+  expiryDate            DateTime?
   isPharmacyItem        Boolean                @default(false)
   requiresPrescription  Boolean                @default(false)
   createdAt             DateTime               @default(now())

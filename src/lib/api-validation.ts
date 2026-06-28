@@ -50,6 +50,7 @@ export const productSchema = z.object({
   isActive: z.boolean().default(true),
   unit: z.string().optional().nullable(),
   brand: z.string().optional().nullable(),
+  expiryDate: z.string().optional().nullable(),
   isPharmacyItem: z.boolean().optional().default(false),
   requiresPrescription: z.boolean().optional().default(false),
   units: z.array(productUnitSchema).optional(),

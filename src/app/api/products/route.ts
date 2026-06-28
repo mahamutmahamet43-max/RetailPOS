@@ -127,6 +127,7 @@ export async function POST(request: Request) {
         isActive: data.isActive,
         storeId: store.id,
         categoryId: data.categoryId,
+        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         isPharmacyItem: data.isPharmacyItem ?? false,
         requiresPrescription: data.requiresPrescription ?? false,
         ...(data.units && {

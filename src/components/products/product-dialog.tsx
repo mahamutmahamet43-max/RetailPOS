@@ -76,6 +76,7 @@ export function ProductDialog({
   const [minimumStock, setMinimumStock] = React.useState("0")
   const [brand, setBrand] = React.useState("")
   const [unit, setUnit] = React.useState("")
+  const [expiryDate, setExpiryDate] = React.useState("")
   const [categoryId, setCategoryId] = React.useState("")
   const [isActive, setIsActive] = React.useState(true)
   const [units, setUnits] = React.useState<UnitRow[]>([])
@@ -96,6 +97,7 @@ export function ProductDialog({
       setMinimumStock(product?.minimumStock !== undefined ? String(product.minimumStock) : "0")
       setBrand(product?.brand || "")
       setUnit(product?.unit || "")
+      setExpiryDate(product?.expiryDate ? product.expiryDate.split("T")[0] : "")
       setCategoryId(product?.categoryId || "")
       setIsActive(product?.isActive ?? true)
       setUnits(
@@ -192,6 +194,7 @@ export function ProductDialog({
         minimumStock: parseInt(minimumStock) || 0,
         brand: brand || null,
         unit: unit || null,
+        expiryDate: expiryDate || null,
         categoryId,
         isActive,
         units: units.map((u) => ({
@@ -300,7 +303,7 @@ export function ProductDialog({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="p-brand">{t("brand")}</Label>
                 <Input
@@ -317,6 +320,15 @@ export function ProductDialog({
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
                   placeholder={t("unitPlaceholder")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-expiry">Expiry Date</Label>
+                <Input
+                  id="p-expiry"
+                  type="date"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
                 />
               </div>
             </div>
