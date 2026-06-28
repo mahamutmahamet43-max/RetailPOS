@@ -143,7 +143,8 @@ export function PosPage() {
 
   React.useEffect(() => {
     if (!showScanner) return
-    let scanner: any
+    let scanner: any = null
+    let running = false
     import("html5-qrcode").then(({ Html5Qrcode }) => {
       scanner = new Html5Qrcode("barcode-scanner")
       scanner.start(
@@ -151,6 +152,7 @@ export function PosPage() {
         { fps: 10, qrbox: { width: 250, height: 150 } },
         (decodedText: string) => {
           setBarcode(decodedText)
+          running = false
           scanner.stop().catch(() => {})
           setShowScanner(false)
           setTimeout(() => {
@@ -159,10 +161,10 @@ export function PosPage() {
           }, 100)
         },
         () => {}
-      ).catch(() => {})
+      ).then(() => { running = true }).catch(() => {})
     })
     return () => {
-      if (scanner) scanner.stop().catch(() => {})
+      if (scanner && running) scanner.stop().catch(() => {})
     }
   }, [showScanner])
 
