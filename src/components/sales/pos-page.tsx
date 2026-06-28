@@ -73,6 +73,7 @@ interface ProductResult {
   name: string
   sku: string | null
   barcode: string | null
+  unit: string | null
   sellingPrice: number
   stockQuantity: number
   units: ProductUnit[]
@@ -159,7 +160,7 @@ export function PosPage() {
 
   function getDefaultUnit(product: ProductResult): { productUnitId: string | null; unitName: string; unitConversionFactor: number; unitPrice: number } {
     if (!product.units || product.units.length === 0) {
-      return { productUnitId: null, unitName: "pcs", unitConversionFactor: 1, unitPrice: product.sellingPrice }
+      return { productUnitId: null, unitName: product.unit || "pcs", unitConversionFactor: 1, unitPrice: product.sellingPrice }
     }
     const defaultUnit = product.units.find((u) => u.isDefaultSaleUnit) || product.units[0]
     return {
