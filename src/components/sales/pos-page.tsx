@@ -149,7 +149,7 @@ export function PosPage() {
       scanner = new Html5Qrcode("barcode-scanner")
       scanner.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 150 } },
+        { fps: 24, qrbox: { width: 500, height: 350 } },
         (decodedText: string) => {
           setBarcode(decodedText)
           running = false
@@ -735,11 +735,11 @@ export function PosPage() {
       )}
 
       <Dialog open={showScanner} onOpenChange={setShowScanner}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl w-full">
           <DialogHeader>
             <DialogTitle>Scan Barcode</DialogTitle>
           </DialogHeader>
-          <div id="barcode-scanner" className="w-full aspect-video bg-muted rounded-lg overflow-hidden" />
+          <div id="barcode-scanner" className="w-full h-[70dvh] min-h-[350px] max-h-[600px] bg-muted rounded-lg overflow-hidden" />
         </DialogContent>
       </Dialog>
     </>
