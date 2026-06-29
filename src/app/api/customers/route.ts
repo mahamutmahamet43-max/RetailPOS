@@ -111,7 +111,7 @@ export async function POST(request: Request) {
         email: data.email?.trim() || null,
         address: data.address?.trim() || null,
         notes: data.notes?.trim() || null,
-        creditLimit: data.creditLimit,
+        creditLimit: data.creditLimit ?? 0,
         storeId: store.id,
       },
     })

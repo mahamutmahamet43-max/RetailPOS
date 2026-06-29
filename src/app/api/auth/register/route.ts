@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
+import crypto from "crypto"
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
-import { sendWelcomeEmail } from "@/lib/email/service"
+import { sendVerifyEmailEmail } from "@/lib/email/service"
 
 export async function POST(request: Request) {
   try {
@@ -60,17 +61,28 @@ export async function POST(request: Request) {
       },
     })
 
-    logger.info("User registered", { userId: user.id, email: user.email })
+    const token = crypto.randomBytes(32).toString("hex")
+    const expires = new Date(Date.now() + 86400000)
 
-    sendWelcomeEmail(user.email, name || "there", `${name || email}'s Store`).catch(() => {})
+    await prisma.verificationToken.create({
+      data: {
+        identifier: `verify:${user.email}`,
+        token,
+        expires,
+      },
+    })
+
+    const locale = "en"
+    const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/${locale}/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`
+
+    sendVerifyEmailEmail(user.email, user.name || "User", verifyUrl).catch(() => {})
+
+    logger.info("User registered", { userId: user.id, email: user.email })
 
     return NextResponse.json(
       {
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-        },
+        message: "Registration successful. Please check your email to verify your account.",
+        email: user.email,
       },
       { status: 201 }
     )

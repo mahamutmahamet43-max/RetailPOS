@@ -5,14 +5,34 @@ import { prisma } from "@/lib/prisma"
 import { sendVerifyEmailEmail } from "@/lib/email/service"
 import { checkRateLimit } from "@/lib/rate-limit"
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    let email: string | null = null
+    let user: { id: string; email: string; name: string | null } | null = null
+
+    const body = await request.json().catch(() => ({}))
+    const bodyEmail = body.email as string | undefined
+
     const session = await auth()
-    if (!session?.user?.id || !session.user.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (session?.user?.id) {
+      user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { id: true, email: true, name: true },
+      })
+    } else if (bodyEmail) {
+      user = await prisma.user.findUnique({
+        where: { email: bodyEmail },
+        select: { id: true, email: true, name: true },
+      })
     }
 
-    const rateCheck = checkRateLimit(`verify-email:${session.user.email}`, { interval: 60000, maxRequests: 2 })
+    if (!user?.email) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    email = user.email
+
+    const rateCheck = checkRateLimit(`verify-email:${email}`, { interval: 60000, maxRequests: 2 })
     if (!rateCheck.success) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -20,30 +40,34 @@ export async function POST() {
       )
     }
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } })
-    if (!user) {
+    const dbUser = await prisma.user.findUnique({ where: { email } })
+    if (!dbUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    if (user.emailVerified) {
+    if (dbUser.emailVerified) {
       return NextResponse.json({ error: "Email already verified" }, { status: 400 })
     }
+
+    await prisma.verificationToken.deleteMany({
+      where: { identifier: `verify:${email}` },
+    })
 
     const token = crypto.randomBytes(32).toString("hex")
     const expires = new Date(Date.now() + 86400000)
 
     await prisma.verificationToken.create({
       data: {
-        identifier: `verify:${user.email}`,
+        identifier: `verify:${email}`,
         token,
         expires,
       },
     })
 
     const locale = "en"
-    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/${locale}/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`
+    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/${locale}/verify-email?token=${token}&email=${encodeURIComponent(email)}`
 
-    sendVerifyEmailEmail(user.email, user.name || "User", verificationUrl).catch(() => {})
+    sendVerifyEmailEmail(email, user.name || "User", verificationUrl).catch(() => {})
 
     return NextResponse.json({ success: true })
   } catch {

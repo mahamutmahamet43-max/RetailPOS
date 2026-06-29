@@ -26,10 +26,14 @@ export default function LoginPage() {
   const params = useParams()
   const locale = params.locale as string
 
+  const [unverifiedEmail, setUnverifiedEmail] = React.useState("")
+  const [resending, setResending] = React.useState(false)
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsLoading(true)
     setError("")
+    setUnverifiedEmail("")
 
     const formData = new FormData(event.currentTarget)
     const email = formData.get("email") as string
@@ -41,6 +45,11 @@ export default function LoginPage() {
         password,
         redirect: false,
       })
+
+      if (result?.error === "EmailNotVerified") {
+        setUnverifiedEmail(email)
+        return
+      }
 
       if (result?.error) {
         setError(t("invalidCredentials"))
@@ -97,6 +106,35 @@ export default function LoginPage() {
 
               {error && (
                 <p className="text-sm text-destructive">{error}</p>
+              )}
+              {unverifiedEmail && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 space-y-2">
+                  <p>{t("emailNotVerified") || "Please verify your email before signing in."}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={resending}
+                    onClick={async () => {
+                      setResending(true)
+                      try {
+                        await fetch("/api/auth/verify-email/send", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ email: unverifiedEmail }),
+                        })
+                        setUnverifiedEmail("")
+                        setError(t("verifyEmailSent") || "Verification email sent!")
+                      } catch {
+                        setError("Failed to resend. Try again.")
+                      } finally {
+                        setResending(false)
+                      }
+                    }}
+                  >
+                    {resending ? t("sending") || "Sending..." : t("verifyEmailResend") || "Resend verification email"}
+                  </Button>
+                </div>
               )}
 
               <div className="flex items-center justify-end">

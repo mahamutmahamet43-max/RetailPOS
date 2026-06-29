@@ -7,10 +7,10 @@ export const authConfig: NextAuthConfig = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60,
   },
   jwt: {
-    maxAge: 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60,
   },
   cookies: {
     sessionToken: {
@@ -49,6 +49,10 @@ export const authConfig: NextAuthConfig = {
           return null
         }
 
+        if (!user.emailVerified) {
+          throw new Error("EmailNotVerified")
+        }
+
         const isValid = await bcrypt.compare(password, user.passwordHash)
 
         if (!isValid) {
@@ -77,11 +81,12 @@ export const authConfig: NextAuthConfig = {
 
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { role: true },
+          select: { role: true, emailVerified: true },
         })
 
         if (dbUser) {
           token.role = dbUser.role
+          token.emailVerified = !!dbUser.emailVerified
         }
       }
       return token
@@ -91,6 +96,7 @@ export const authConfig: NextAuthConfig = {
         const user = session.user as unknown as Record<string, unknown>
         user.id = token.id as string
         user.role = token.role as string
+        user.emailVerified = token.emailVerified as boolean
       }
       return session
     },

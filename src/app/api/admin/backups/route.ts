@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { requireRole } from "@/lib/role"
 import { logger } from "@/lib/logger"
-import { sendBackupCompleteEmail } from "@/lib/email/service"
 
 export const dynamic = "force-dynamic"
 
@@ -34,21 +33,20 @@ export async function POST() {
   if (!store) return noStoreResponse()
 
   try {
-    const tables = [
-      "User", "Store", "Subscription", "Payment",
-      "Category", "Product", "Customer", "InventoryTransaction",
-      "Sale", "SaleItem", "Account", "Session", "VerificationToken",
-    ] as const
+    const storeId = store.id
 
-    const backupData: Record<string, unknown> = {}
-
-    for (const table of tables) {
-      const model = (prisma as unknown as Record<string, unknown>)[table as string] as
-        | { findMany: () => Promise<unknown[]> }
-        | undefined
-      if (model?.findMany) {
-        backupData[table] = await model.findMany()
-      }
+    const backupData: Record<string, unknown> = {
+      store: await prisma.store.findUnique({ where: { id: storeId } }),
+      user: await prisma.user.findUnique({ where: { id: auth.userId } }),
+      categories: await prisma.category.findMany({ where: { storeId } }),
+      products: await prisma.product.findMany({ where: { storeId }, include: { units: true } }),
+      customers: await prisma.customer.findMany({ where: { storeId } }),
+      suppliers: await prisma.supplier.findMany({ where: { storeId } }),
+      purchases: await prisma.purchase.findMany({ where: { storeId } }),
+      purchaseItems: await prisma.purchaseItem.findMany({ where: { purchase: { storeId } } }),
+      inventory: await prisma.inventoryTransaction.findMany({ where: { storeId } }),
+      sales: await prisma.sale.findMany({ where: { storeId }, include: { items: true } }),
+      storeSettings: await prisma.storeSetting.findMany({ where: { storeId } }),
     }
 
     const dataJson = JSON.stringify(backupData)
@@ -58,7 +56,7 @@ export async function POST() {
 
     const backup = await prisma.backup.create({
       data: {
-        storeId: store.id,
+        storeId,
         filename,
         data: dataJson,
         size,
@@ -67,14 +65,6 @@ export async function POST() {
     })
 
     logger.info("Manual backup created", { filename, size })
-
-    const owner = await prisma.user.findUnique({
-      where: { id: auth.userId },
-      select: { email: true, name: true },
-    })
-    if (owner?.email) {
-      sendBackupCompleteEmail(owner.email, owner.name || "Owner", filename, size).catch(() => {})
-    }
 
     return NextResponse.json({
       success: true,

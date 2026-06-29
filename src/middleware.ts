@@ -88,6 +88,14 @@ export default async function middleware(req: NextRequest) {
     if (isAuthPage && isLoggedIn) {
       return Response.redirect(new URL(`/${locale}/dashboard`, req.url))
     }
+
+    if (isDashboardPage && isLoggedIn && session) {
+      const emailVerified = session.emailVerified as boolean | undefined
+      if (emailVerified === false) {
+        const verifyUrl = new URL(`/${locale}/verify-email`, req.url)
+        return Response.redirect(verifyUrl)
+      }
+    }
   }
 
   return intlMiddleware(req)
