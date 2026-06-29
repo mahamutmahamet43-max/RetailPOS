@@ -1,5 +1,5 @@
 import createMiddleware from "next-intl/middleware"
-import { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { routing, defaultLocale, locales } from "@/i18n/routing"
 import { jwtDecrypt, calculateJwkThumbprint, base64url } from "jose"
 import { hkdf } from "@panva/hkdf"
@@ -40,6 +40,13 @@ async function decryptSessionToken(token: string, secret: string, salt: string) 
 
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
+
+  // Rewrite root path to default locale instead of redirecting
+  if (pathname === "/") {
+    req.nextUrl.pathname = "/en"
+    return NextResponse.rewrite(req.nextUrl)
+  }
+
   const locale = getValidLocale(pathname)
 
   const pathnameWithoutLocale = pathname.replace(/^\/(en|so)/, "") || "/"
@@ -101,5 +108,5 @@ export default async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next|_vercel|.*\\..*).+)"],
+  matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
 }
