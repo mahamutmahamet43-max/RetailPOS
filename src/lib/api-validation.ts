@@ -104,7 +104,7 @@ export const inventorySchema = z.object({
 
 export const settingsProfileSchema = z.object({
   name: z.string().optional(),
-  email: z.string().email("Invalid email").optional(),
+  email: z.string().email("Invalid email").optional().nullable().or(z.literal("")),
   image: z.string().optional().nullable(),
 })
 

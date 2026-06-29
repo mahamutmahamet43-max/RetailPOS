@@ -2,7 +2,7 @@
   "name": "RetailPOS",
   "short_name": "RetailPOS",
   "description": "Modern point of sale for your business",
-  "start_url": "/",
+  "start_url": "/en/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#18181b",

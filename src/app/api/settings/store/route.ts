@@ -10,7 +10,7 @@ const storeSettingsSchema = z.object({
   description: z.string().optional().nullable(),
   address: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email("Invalid email").optional(),
+  email: z.string().email("Invalid email").optional().nullable().or(z.literal("")),
   currency: z.string().optional(),
   timezone: z.string().optional(),
   dateFormat: z.string().optional(),

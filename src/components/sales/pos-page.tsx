@@ -99,6 +99,30 @@ function saveCart(cart: CartItem[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cart)) } catch {}
 }
 
+const META_KEY = "retailpos-pos-meta"
+
+interface PosMeta {
+  selectedCustomerId: string
+  paymentMethod: string
+  discount: string
+  tax: string
+  amountPaid: string
+}
+
+function loadMeta(): PosMeta {
+  if (typeof window === "undefined") return { selectedCustomerId: "", paymentMethod: "SAHAL", discount: "0", tax: "0", amountPaid: "" }
+  try {
+    const raw = localStorage.getItem(META_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return { selectedCustomerId: "", paymentMethod: "SAHAL", discount: "0", tax: "0", amountPaid: "" }
+}
+
+function saveMeta(meta: PosMeta) {
+  if (typeof window === "undefined") return
+  try { localStorage.setItem(META_KEY, JSON.stringify(meta)) } catch {}
+}
+
 export function PosPage() {
   const t = useTranslations("sales")
   const common = useTranslations("common")
@@ -107,12 +131,13 @@ export function PosPage() {
   const [searchQuery, setSearchQuery] = React.useState("")
   const [searchResults, setSearchResults] = React.useState<ProductResult[]>([])
   const [cart, setCart] = React.useState<CartItem[]>(loadCart)
+  const meta = React.useRef(loadMeta())
   const [customers, setCustomers] = React.useState<Customer[]>([])
-  const [selectedCustomerId, setSelectedCustomerId] = React.useState("")
-  const [paymentMethod, setPaymentMethod] = React.useState("SAHAL")
-  const [amountPaid, setAmountPaid] = React.useState("")
-  const [discount, setDiscount] = React.useState("0")
-  const [tax, setTax] = React.useState("0")
+  const [selectedCustomerId, setSelectedCustomerId] = React.useState(meta.current.selectedCustomerId)
+  const [paymentMethod, setPaymentMethod] = React.useState(meta.current.paymentMethod)
+  const [amountPaid, setAmountPaid] = React.useState(meta.current.amountPaid)
+  const [discount, setDiscount] = React.useState(meta.current.discount)
+  const [tax, setTax] = React.useState(meta.current.tax)
   const [checkingOut, setCheckingOut] = React.useState(false)
   const [error, setError] = React.useState("")
   const [lastSale, setLastSale] = React.useState<any>(null)
@@ -148,6 +173,10 @@ export function PosPage() {
   React.useEffect(() => {
     saveCart(cart)
   }, [cart])
+
+  React.useEffect(() => {
+    saveMeta({ selectedCustomerId, paymentMethod, discount, tax, amountPaid })
+  }, [selectedCustomerId, paymentMethod, discount, tax, amountPaid])
 
   React.useEffect(() => {
     fetch("/api/customers?limit=1000")
