@@ -109,7 +109,7 @@ export function PosPage() {
   const [cart, setCart] = React.useState<CartItem[]>(loadCart)
   const [customers, setCustomers] = React.useState<Customer[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = React.useState("")
-  const [paymentMethod, setPaymentMethod] = React.useState("SAHAL")
+  const [paymentMethod, setPaymentMethod] = React.useState("CASH")
   const [amountPaid, setAmountPaid] = React.useState("")
   const [discount, setDiscount] = React.useState("0")
   const [tax, setTax] = React.useState("0")
