@@ -88,7 +88,7 @@ export const saleItemSchema = z.object({
 export const saleSchema = z.object({
   items: z.array(saleItemSchema).min(1, "At least one item is required"),
   customerId: z.string().optional().nullable(),
-  paymentMethod: z.enum(["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD"]),
+  paymentMethod: z.enum(["CASH"]),
   amountPaid: z.number().min(0).default(0),
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),
@@ -111,23 +111,6 @@ export const settingsProfileSchema = z.object({
 export const settingsPasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().min(8, "New password must be at least 8 characters"),
-})
-
-export const billingSubscribeSchema = z.object({
-  plan: z.enum(["FREE", "BASIC", "PRO", "ENTERPRISE"]),
-  provider: z.enum(["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]).optional(),
-  billingCycle: z.enum(["MONTHLY", "YEARLY"]).optional(),
-  paymentReference: z.string().optional(),
-  customerPhone: z.string().optional(),
-  customerEmail: z.string().email().optional().or(z.literal("")),
-})
-
-export const billingRenewSchema = z.object({
-  provider: z.enum(["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]),
-  billingCycle: z.enum(["MONTHLY", "YEARLY"]),
-  paymentReference: z.string().optional(),
-  customerPhone: z.string().optional(),
-  customerEmail: z.string().email().optional().or(z.literal("")),
 })
 
 export const supplierSchema = z.object({

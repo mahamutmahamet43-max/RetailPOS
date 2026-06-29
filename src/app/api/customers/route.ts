@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { validateOrError, customerSchema } from "@/lib/api-validation"
-import { enforceLimit } from "@/lib/subscription/enforce"
 import { requireRole } from "@/lib/role"
 
 export async function GET(request: Request) {
@@ -79,10 +78,6 @@ export async function POST(request: Request) {
     if (!validation.success) return validation.response
 
     const data = validation.data
-
-    const customerCount = await prisma.customer.count({ where: { storeId: store.id, isActive: true } })
-    const limitCheck = await enforceLimit(store.id, "customers", customerCount)
-    if (limitCheck) return limitCheck
 
     const existingPhone = await prisma.customer.findFirst({
       where: { phone: data.phone.trim(), storeId: store.id },

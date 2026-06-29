@@ -58,7 +58,6 @@ export default async function middleware(req: NextRequest) {
     pathnameWithoutLocale.startsWith("/reset-password") ||
     pathnameWithoutLocale.startsWith("/verify-email")
   const isDashboardPage = pathnameWithoutLocale.startsWith("/dashboard")
-  const isBillingPage = pathnameWithoutLocale.startsWith("/dashboard/billing")
 
   if (isDashboardPage || isAuthPage) {
     const isProduction = process.env.NODE_ENV === "production"
@@ -88,19 +87,6 @@ export default async function middleware(req: NextRequest) {
 
     if (isAuthPage && isLoggedIn) {
       return Response.redirect(new URL(`/${locale}/dashboard`, req.url))
-    }
-
-    if (isDashboardPage && isLoggedIn && !isBillingPage && session) {
-      const subscriptionStatus = session.subscriptionStatus as string | undefined
-      const subscriptionEndsAt = session.subscriptionEndsAt as string | undefined
-
-      if (subscriptionStatus === "EXPIRED" || subscriptionStatus === "SUSPENDED" || subscriptionStatus === "CANCELLED") {
-        return Response.redirect(new URL(`/${locale}/dashboard/billing`, req.url))
-      }
-
-      if (subscriptionStatus === "TRIAL" && subscriptionEndsAt && new Date(subscriptionEndsAt) < new Date()) {
-        return Response.redirect(new URL(`/${locale}/dashboard/billing`, req.url))
-      }
     }
   }
 

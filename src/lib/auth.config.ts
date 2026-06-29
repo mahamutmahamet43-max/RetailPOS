@@ -75,29 +75,13 @@ export const authConfig: NextAuthConfig = {
       if ((user || trigger === "update") && token.id) {
         const { prisma } = await import("@/lib/prisma")
 
-        const [dbUser, store] = await Promise.all([
-          prisma.user.findUnique({
-            where: { id: token.id as string },
-            select: { role: true },
-          }),
-          prisma.store.findFirst({
-            where: { ownerId: token.id as string },
-            select: {
-              subscription: {
-                select: { status: true, endsAt: true, trialEndsAt: true },
-              },
-            },
-          }),
-        ])
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true },
+        })
 
         if (dbUser) {
           token.role = dbUser.role
-        }
-
-        if (store?.subscription) {
-          const sub = store.subscription
-          token.subscriptionStatus = sub.status
-          token.subscriptionEndsAt = sub.endsAt?.toISOString() || sub.trialEndsAt?.toISOString()
         }
       }
       return token
@@ -107,8 +91,6 @@ export const authConfig: NextAuthConfig = {
         const user = session.user as unknown as Record<string, unknown>
         user.id = token.id as string
         user.role = token.role as string
-        user.subscriptionStatus = token.subscriptionStatus as string | undefined
-        user.subscriptionEndsAt = token.subscriptionEndsAt as string | undefined
       }
       return session
     },

@@ -46,9 +46,6 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(password, 12)
 
-    const now = new Date()
-    const trialEnd = new Date(now.getTime() + 14 * 86400000)
-
     const user = await prisma.user.create({
       data: {
         name,
@@ -58,15 +55,6 @@ export async function POST(request: Request) {
           create: {
             name: `${name || email}'s Store`,
             slug: email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now(),
-            subscription: {
-              create: {
-                plan: "FREE",
-                status: "TRIAL",
-                startsAt: now,
-                trialEndsAt: trialEnd,
-                endsAt: trialEnd,
-              },
-            },
           },
         },
       },

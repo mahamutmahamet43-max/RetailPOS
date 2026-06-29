@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { validateOrError, productSchema } from "@/lib/api-validation"
-import { enforceLimit } from "@/lib/subscription/enforce"
 import { requireRole } from "@/lib/role"
 
 export async function GET(request: Request) {
@@ -80,10 +79,6 @@ export async function POST(request: Request) {
     if (!validation.success) return validation.response
 
     const data = validation.data
-
-    const productCount = await prisma.product.count({ where: { storeId: store.id, isActive: true } })
-    const limitCheck = await enforceLimit(store.id, "products", productCount)
-    if (limitCheck) return limitCheck
 
     const category = await prisma.category.findFirst({
       where: { id: data.categoryId, storeId: store.id },

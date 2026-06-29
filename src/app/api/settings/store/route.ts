@@ -88,15 +88,6 @@ export async function PUT(request: Request) {
           name: validBody.name || "My Store",
           slug,
           ownerId: authResult.userId,
-          subscription: {
-            create: {
-              plan: "FREE",
-              status: "TRIAL",
-              startsAt: new Date(),
-              trialEndsAt: new Date(Date.now() + 14 * 86400000),
-              endsAt: new Date(Date.now() + 14 * 86400000),
-            },
-          },
         },
       })
     }

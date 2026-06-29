@@ -36,15 +36,6 @@ async function main() {
     },
   })
 
-  await prisma.subscription.create({
-    data: {
-      plan: "FREE",
-      status: "ACTIVE",
-      startsAt: new Date(),
-      storeId: store.id,
-    },
-  })
-
   await prisma.storeSetting.create({
     data: {
       storeId: store.id,

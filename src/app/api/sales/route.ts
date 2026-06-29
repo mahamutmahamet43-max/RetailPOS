@@ -5,8 +5,6 @@ import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { validateOrError, saleSchema } from "@/lib/api-validation"
 import { sendInvoiceEmail } from "@/lib/email/service"
-import { getStoreSubscription, isSubscriptionActive } from "@/lib/subscription/enforce"
-import { getPlanConfig } from "@/lib/subscription/plans"
 import { requireRole } from "@/lib/role"
 
 export async function GET(request: Request) {
@@ -117,40 +115,6 @@ export async function POST(request: Request) {
       0
     )
     const saleTotal = saleSubtotal - discount + tax
-
-    const subscription = await getStoreSubscription(store.id)
-    if (!subscription || !isSubscriptionActive(subscription)) {
-      const reason = !subscription
-        ? "No active subscription."
-        : subscription.status === "TRIAL"
-          ? "Your trial has expired."
-          : `Your subscription is ${subscription.status.toLowerCase()}.`
-      return NextResponse.json(
-        { error: `${reason} Please subscribe or renew to process sales.` },
-        { status: 402 }
-      )
-    }
-
-    const config = getPlanConfig(subscription.plan)
-    if (config.limits.monthlySales !== -1) {
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      const monthlyTotal = await prisma.sale.aggregate({
-        where: { storeId: store.id, createdAt: { gte: startOfMonth }, status: "COMPLETED" },
-        _sum: { total: true },
-      })
-      const currentMonthly = monthlyTotal._sum.total || 0
-      if (currentMonthly + saleTotal > config.limits.monthlySales) {
-        return NextResponse.json(
-          {
-            error: `Your ${config.name} plan has a monthly sales cap of $${config.limits.monthlySales.toLocaleString()}. This sale would exceed it. Please upgrade to continue.`,
-            limit: config.limits.monthlySales,
-            current: currentMonthly,
-          },
-          { status: 403 }
-        )
-      }
-    }
 
     const productIds = items.map((i) => i.productId)
     const products = await prisma.product.findMany({

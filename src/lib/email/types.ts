@@ -2,8 +2,6 @@ export type EmailTemplate =
   | "welcome"
   | "verify-email"
   | "password-reset"
-  | "subscription-confirmed"
-  | "payment-receipt"
   | "invoice"
   | "low-stock"
   | "daily-sales"
