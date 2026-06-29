@@ -155,7 +155,14 @@ export async function POST(request: Request) {
     if (newQuantity <= product.minimumStock) {
       const user = await prisma.user.findUnique({ where: { id: auth.userId }, select: { email: true, name: true } })
       if (user?.email) {
-        sendLowStockEmail(user.email, user.name || "Store Owner", store.name || "Store", product.name, newQuantity, product.minimumStock).catch(() => {})
+        const lowStockResult = await sendLowStockEmail(user.email, user.name || "Store Owner", store.name || "Store", product.name, newQuantity, product.minimumStock)
+      if (!lowStockResult.success) {
+        logger.warn("Low stock email not sent", {
+          product: product.name,
+          email: user.email,
+          error: lowStockResult.error,
+        })
+      }
       }
     }
 

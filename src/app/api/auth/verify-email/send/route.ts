@@ -3,6 +3,7 @@ import crypto from "crypto"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendVerifyEmailEmail } from "@/lib/email/service"
+import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 export async function POST(request: Request) {
@@ -68,10 +69,18 @@ export async function POST(request: Request) {
     const locale = "en"
     const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/${locale}/verify-email?token=${token}&email=${encodeURIComponent(email)}`
 
-    sendVerifyEmailEmail(email, user.name || "User", verificationUrl).catch(() => {})
+    const emailResult = await sendVerifyEmailEmail(email, user.name || "User", verificationUrl)
+
+    if (!emailResult.success) {
+      return NextResponse.json(
+        { error: "We couldn't send the verification email. Please try again in a few minutes." },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (error) {
+    logger.error("Verify email send error", error instanceof Error ? error : undefined)
     return NextResponse.json(
       { error: "An error occurred. Please try again." },
       { status: 500 }

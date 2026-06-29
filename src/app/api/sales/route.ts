@@ -254,7 +254,14 @@ export async function POST(request: Request) {
         price: `${i.unitPrice.toFixed(2)}`,
         total: `${i.total.toFixed(2)}`,
       }))
-      sendInvoiceEmail(sale.customer.email, sale.customer.firstName, sale.saleNumber, `${sale.total.toFixed(2)}`, items, store.name || "Store").catch(() => {})
+      const emailResult = await sendInvoiceEmail(sale.customer.email, sale.customer.firstName, sale.saleNumber, `${sale.total.toFixed(2)}`, items, store.name || "Store")
+      if (!emailResult.success) {
+        logger.warn("Invoice email not sent", {
+          saleNumber: sale.saleNumber,
+          email: sale.customer.email,
+          error: emailResult.error,
+        })
+      }
     }
 
     return NextResponse.json(sale, { status: 201 })

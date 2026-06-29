@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import crypto from "crypto"
 import { prisma } from "@/lib/prisma"
 import { sendPasswordResetEmail } from "@/lib/email/service"
+import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 export async function POST(request: Request) {
@@ -40,10 +41,18 @@ export async function POST(request: Request) {
     const locale = "en"
     const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/${locale}/reset-password?token=${token}&email=${encodeURIComponent(email)}`
 
-    sendPasswordResetEmail(email, user.name || "User", resetUrl).catch(() => {})
+    const emailResult = await sendPasswordResetEmail(email, user.name || "User", resetUrl)
+
+    if (!emailResult.success) {
+      logger.error("Password reset email failed", undefined, {
+        email,
+        error: emailResult.error,
+      })
+    }
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (error) {
+    logger.error("Forgot password error", error instanceof Error ? error : undefined)
     return NextResponse.json({ success: true })
   }
 }

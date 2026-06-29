@@ -76,16 +76,21 @@ export async function POST(request: Request) {
     const locale = "en"
     const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/${locale}/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`
 
-    sendVerifyEmailEmail(user.email, user.name || "User", verifyUrl).catch(() => {})
+    const emailResult = await sendVerifyEmailEmail(user.email, user.name || "User", verifyUrl)
 
-    logger.info("User registered", { userId: user.id, email: user.email })
+    logger.info("User registered", { userId: user.id, email: user.email, emailSent: emailResult.success })
+
+    const message = emailResult.success
+      ? "Registration successful. Please check your email to verify your account."
+      : "Account created. We couldn't send the verification email. Please try again later."
 
     return NextResponse.json(
       {
-        message: "Registration successful. Please check your email to verify your account.",
+        message,
         email: user.email,
+        emailSent: emailResult.success,
       },
-      { status: 201 }
+      { status: emailResult.success ? 201 : 201 }
     )
   } catch (error) {
     logger.error("Registration error", error instanceof Error ? error : undefined)
