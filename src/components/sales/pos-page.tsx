@@ -109,7 +109,7 @@ export function PosPage() {
   const [cart, setCart] = React.useState<CartItem[]>(loadCart)
   const [customers, setCustomers] = React.useState<Customer[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = React.useState("")
-  const [paymentMethod, setPaymentMethod] = React.useState("CASH")
+  const [paymentMethod, setPaymentMethod] = React.useState("SAHAL")
   const [amountPaid, setAmountPaid] = React.useState("")
   const [discount, setDiscount] = React.useState("0")
   const [tax, setTax] = React.useState("0")
@@ -693,10 +693,10 @@ export function PosPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CASH">{t("cash")}</SelectItem>
+                <SelectItem value="SAHAL">Sahal</SelectItem>
                 <SelectItem value="ZAAD">ZAAD</SelectItem>
                 <SelectItem value="EVC_PLUS">EVC Plus</SelectItem>
-                <SelectItem value="SAHAL">Sahal</SelectItem>
+                <SelectItem value="CASH">{t("cash")}</SelectItem>
                 <SelectItem value="CARD">{t("card")}</SelectItem>
               </SelectContent>
             </Select>
