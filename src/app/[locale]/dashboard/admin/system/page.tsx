@@ -60,7 +60,9 @@ export default function BackupPage() {
   const [message, setMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null)
 
   const [seeding, setSeeding] = React.useState(false)
+  const [resetting, setResetting] = React.useState(false)
   const [showSeedConfirm, setShowSeedConfirm] = React.useState(false)
+  const [showResetConfirm, setShowResetConfirm] = React.useState(false)
 
   const [restoreTarget, setRestoreTarget] = React.useState<Backup | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<Backup | null>(null)
@@ -159,6 +161,25 @@ export default function BackupPage() {
       showMessage("error", t("seedDemoFailed"))
     } finally {
       setSeeding(false)
+    }
+  }
+
+  async function resetDemo() {
+    setShowResetConfirm(false)
+    setResetting(true)
+    try {
+      const res = await fetch("/api/admin/seed-demo?force=true", { method: "POST" })
+      const data = await res.json()
+      if (data.success) {
+        showMessage("success", t("seedDemoSuccess"))
+        await loadBackups()
+      } else {
+        showMessage("error", data.error || t("seedDemoFailed"))
+      }
+    } catch {
+      showMessage("error", t("seedDemoFailed"))
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -295,18 +316,33 @@ export default function BackupPage() {
           <p className="text-sm text-muted-foreground">
             {t("seedDemoDescription")}
           </p>
-          <Button
-            onClick={() => setShowSeedConfirm(true)}
-            disabled={seeding}
-            className="gap-2"
-          >
-            {seeding ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            {seeding ? t("seedingDemo") : t("seedDemoButton")}
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => setShowSeedConfirm(true)}
+              disabled={seeding || resetting}
+              className="gap-2"
+            >
+              {seeding ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {seeding ? t("seedingDemo") : t("seedDemoButton")}
+            </Button>
+            <Button
+              onClick={() => setShowResetConfirm(true)}
+              disabled={seeding || resetting}
+              variant="destructive"
+              className="gap-2"
+            >
+              {resetting ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
+              {resetting ? t("resettingDemo") : t("seedDemoResetButton")}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -453,6 +489,38 @@ export default function BackupPage() {
                 <Sparkles className="h-4 w-4" />
               )}
               {seeding ? t("seedingDemo") : t("seedDemoButton")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResetConfirm} onOpenChange={(open) => { if (!open) setShowResetConfirm(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              {t("seedDemoResetTitle")}
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              {t("seedDemoResetConfirm")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowResetConfirm(false)}>
+              {common("cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={resetDemo}
+              disabled={resetting}
+              className="gap-2"
+            >
+              {resetting ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              {resetting ? t("resettingDemo") : t("seedDemoResetButton")}
             </Button>
           </DialogFooter>
         </DialogContent>

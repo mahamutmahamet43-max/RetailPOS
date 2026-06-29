@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getCurrentStore, noStoreResponse } from "@/lib/store"
 import { requireRole } from "@/lib/role"
@@ -6,10 +6,13 @@ import { logger } from "@/lib/logger"
 
 export const dynamic = "force-dynamic"
 
-const paymentMethods = ["SAHAL", "CASH", "CARD", "ZAAD", "EVC_PLUS"] as const
+const PAYMENT_WEIGHTS = [
+  "SAHAL", "SAHAL", "SAHAL", "SAHAL", "SAHAL", "SAHAL", "SAHAL", "SAHAL", "SAHAL", "SAHAL",
+  "SAHAL", "SAHAL", "ZAAD", "ZAAD", "ZAAD", "EVC_PLUS", "EVC_PLUS", "CASH", "CASH", "CARD",
+]
 
 const categoryData = [
-  { name: "Beverages", description: "Carbonated drinks and sodas", color: "#EF4444" },
+  { name: "Beverages", description: "Carbonated drinks, juices and sodas", color: "#EF4444" },
   { name: "Dairy", description: "Milk, cheese, yogurt and dairy products", color: "#F59E0B" },
   { name: "Bakery", description: "Bread, cakes and pastries", color: "#D97706" },
   { name: "Snacks", description: "Chips, nuts and snack foods", color: "#E97316" },
@@ -17,13 +20,17 @@ const categoryData = [
   { name: "Cooking Oil", description: "Cooking oils and olive oils", color: "#FCD34D" },
   { name: "Sugar & Sweeteners", description: "Sugar and sweetener products", color: "#F472B6" },
   { name: "Tea & Coffee", description: "Hot beverage products", color: "#8B4513" },
-  { name: "Bottled Water", description: "Drinking water in various sizes", color: "#3B82F6" },
-  { name: "Personal Care", description: "Soap, shampoo and hygiene products", color: "#EC4899" },
+  { name: "Bottled Water", description: "Drinking water", color: "#3B82F6" },
+  { name: "Personal Care", description: "Soap, shampoo and hygiene", color: "#EC4899" },
   { name: "Cleaning Supplies", description: "Household cleaning products", color: "#6366F1" },
   { name: "Canned Foods", description: "Canned goods and preserved foods", color: "#14B8A6" },
   { name: "Electronics", description: "Batteries, cables and accessories", color: "#8B5CF6" },
   { name: "Stationery", description: "Office and school supplies", color: "#0EA5E9" },
   { name: "Baby Products", description: "Baby care and feeding products", color: "#F43F5E" },
+  { name: "Frozen Foods", description: "Frozen meat, vegetables and ready meals", color: "#06B6D4" },
+  { name: "Meat & Poultry", description: "Fresh meat and poultry products", color: "#DC2626" },
+  { name: "Spices & Seasonings", description: "Spices, herbs and cooking seasonings", color: "#D946EF" },
+  { name: "Cereals & Breakfast", description: "Breakfast cereals, oatmeal and spreads", color: "#F97316" },
 ]
 
 const productsByCategory: Record<string, { name: string; costPrice: number; sellingPrice: number; barcode: string; minimumStock: number; unit: string }[]> = {
@@ -38,6 +45,9 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Sprite 1.5L", costPrice: 0.90, sellingPrice: 1.35, barcode: "2001000100008", minimumStock: 12, unit: "pcs" },
     { name: "Fanta Orange 1.5L", costPrice: 0.90, sellingPrice: 1.35, barcode: "2001000100009", minimumStock: 12, unit: "pcs" },
     { name: "Miranda 330ml", costPrice: 0.30, sellingPrice: 0.40, barcode: "2001000100010", minimumStock: 24, unit: "pcs" },
+    { name: "Mountain Dew 330ml", costPrice: 0.34, sellingPrice: 0.48, barcode: "2001000100011", minimumStock: 24, unit: "pcs" },
+    { name: "Energy Drink 250ml", costPrice: 1.20, sellingPrice: 2.00, barcode: "2001000100012", minimumStock: 12, unit: "pcs" },
+    { name: "Coconut Water 330ml", costPrice: 0.60, sellingPrice: 1.00, barcode: "2001000100013", minimumStock: 12, unit: "pcs" },
   ],
   Dairy: [
     { name: "Fresh Milk 1L", costPrice: 1.20, sellingPrice: 1.80, barcode: "2001000200001", minimumStock: 10, unit: "pcs" },
@@ -50,6 +60,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Condensed Milk 397g", costPrice: 1.80, sellingPrice: 2.80, barcode: "2001000200008", minimumStock: 10, unit: "pcs" },
     { name: "Ice Cream 1L", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001000200009", minimumStock: 8, unit: "pcs" },
     { name: "Evaporated Milk 410g", costPrice: 1.20, sellingPrice: 1.90, barcode: "2001000200010", minimumStock: 15, unit: "pcs" },
+    { name: "Greek Yogurt 500g", costPrice: 2.00, sellingPrice: 3.20, barcode: "2001000200011", minimumStock: 8, unit: "pcs" },
+    { name: "Ghee 500g", costPrice: 3.50, sellingPrice: 5.50, barcode: "2001000200012", minimumStock: 6, unit: "pcs" },
   ],
   Bakery: [
     { name: "White Bread Loaf", costPrice: 0.40, sellingPrice: 0.70, barcode: "2001000300001", minimumStock: 10, unit: "pcs" },
@@ -62,6 +74,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Bagel 4pk", costPrice: 1.10, sellingPrice: 1.90, barcode: "2001000300008", minimumStock: 8, unit: "pcs" },
     { name: "Cinnamon Roll", costPrice: 0.70, sellingPrice: 1.20, barcode: "2001000300009", minimumStock: 10, unit: "pcs" },
     { name: "Flatbread 5pk", costPrice: 0.90, sellingPrice: 1.50, barcode: "2001000300010", minimumStock: 10, unit: "pcs" },
+    { name: "Sourdough Loaf", costPrice: 1.00, sellingPrice: 1.80, barcode: "2001000300011", minimumStock: 8, unit: "pcs" },
+    { name: "Danish Pastry 4pk", costPrice: 1.60, sellingPrice: 2.60, barcode: "2001000300012", minimumStock: 8, unit: "pcs" },
   ],
   Snacks: [
     { name: "Potato Chips 150g", costPrice: 0.80, sellingPrice: 1.20, barcode: "2001000400001", minimumStock: 20, unit: "pcs" },
@@ -74,6 +88,9 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Pretzels 150g", costPrice: 0.60, sellingPrice: 1.00, barcode: "2001000400008", minimumStock: 15, unit: "pcs" },
     { name: "Rice Cakes 120g", costPrice: 0.80, sellingPrice: 1.30, barcode: "2001000400009", minimumStock: 15, unit: "pcs" },
     { name: "Trail Mix 150g", costPrice: 1.80, sellingPrice: 2.80, barcode: "2001000400010", minimumStock: 10, unit: "pcs" },
+    { name: "Beef Jerky 100g", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001000400011", minimumStock: 8, unit: "pcs" },
+    { name: "Chocolate Bar 100g", costPrice: 1.00, sellingPrice: 1.80, barcode: "2001000400012", minimumStock: 20, unit: "pcs" },
+    { name: "Granola Bar 6pk", costPrice: 1.50, sellingPrice: 2.50, barcode: "2001000400013", minimumStock: 10, unit: "pcs" },
   ],
   "Rice & Pasta": [
     { name: "Sona Rice 1kg", costPrice: 1.10, sellingPrice: 1.60, barcode: "2001000500001", minimumStock: 15, unit: "pcs" },
@@ -86,6 +103,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Penne Pasta 500g", costPrice: 0.70, sellingPrice: 1.10, barcode: "2001000500008", minimumStock: 15, unit: "pcs" },
     { name: "Wheat Flour 2kg", costPrice: 1.50, sellingPrice: 2.30, barcode: "2001000500009", minimumStock: 10, unit: "pcs" },
     { name: "Couscous 500g", costPrice: 0.90, sellingPrice: 1.40, barcode: "2001000500010", minimumStock: 15, unit: "pcs" },
+    { name: "Jasmine Rice 1kg", costPrice: 1.50, sellingPrice: 2.40, barcode: "2001000500011", minimumStock: 10, unit: "pcs" },
+    { name: "Egg Noodles 500g", costPrice: 0.80, sellingPrice: 1.30, barcode: "2001000500012", minimumStock: 15, unit: "pcs" },
   ],
   "Cooking Oil": [
     { name: "Vegetable Oil 1L", costPrice: 1.80, sellingPrice: 2.80, barcode: "2001000600001", minimumStock: 12, unit: "pcs" },
@@ -98,6 +117,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Coconut Oil 500ml", costPrice: 3.00, sellingPrice: 4.80, barcode: "2001000600008", minimumStock: 8, unit: "pcs" },
     { name: "Sesame Oil 250ml", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001000600009", minimumStock: 8, unit: "pcs" },
     { name: "Palm Oil 2L", costPrice: 3.00, sellingPrice: 4.50, barcode: "2001000600010", minimumStock: 8, unit: "pcs" },
+    { name: "Avocado Oil 500ml", costPrice: 5.00, sellingPrice: 8.00, barcode: "2001000600011", minimumStock: 6, unit: "pcs" },
+    { name: "Grapeseed Oil 500ml", costPrice: 3.50, sellingPrice: 5.50, barcode: "2001000600012", minimumStock: 6, unit: "pcs" },
   ],
   "Sugar & Sweeteners": [
     { name: "White Sugar 1kg", costPrice: 0.90, sellingPrice: 1.40, barcode: "2001000700001", minimumStock: 15, unit: "pcs" },
@@ -108,6 +129,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Honey 500g", costPrice: 4.00, sellingPrice: 6.50, barcode: "2001000700006", minimumStock: 8, unit: "pcs" },
     { name: "Splenda Sweetener 100pk", costPrice: 3.50, sellingPrice: 5.50, barcode: "2001000700007", minimumStock: 8, unit: "pcs" },
     { name: "Jaggery 500g", costPrice: 1.20, sellingPrice: 1.90, barcode: "2001000700008", minimumStock: 10, unit: "pcs" },
+    { name: "Maple Syrup 250ml", costPrice: 4.50, sellingPrice: 7.00, barcode: "2001000700009", minimumStock: 6, unit: "pcs" },
+    { name: "Agave Syrup 350ml", costPrice: 3.00, sellingPrice: 5.00, barcode: "2001000700010", minimumStock: 6, unit: "pcs" },
   ],
   "Tea & Coffee": [
     { name: "Black Tea Bags 100pk", costPrice: 1.50, sellingPrice: 2.50, barcode: "2001000800001", minimumStock: 15, unit: "pcs" },
@@ -120,6 +143,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Espresso Beans 250g", costPrice: 4.50, sellingPrice: 7.00, barcode: "2001000800008", minimumStock: 6, unit: "pcs" },
     { name: "Decaf Coffee 200g", costPrice: 3.80, sellingPrice: 6.00, barcode: "2001000800009", minimumStock: 8, unit: "pcs" },
     { name: "Earl Grey Tea 25pk", costPrice: 1.40, sellingPrice: 2.30, barcode: "2001000800010", minimumStock: 10, unit: "pcs" },
+    { name: "Matcha Green Tea 100g", costPrice: 5.00, sellingPrice: 8.50, barcode: "2001000800011", minimumStock: 6, unit: "pcs" },
+    { name: "Chamomile Tea 20pk", costPrice: 1.30, sellingPrice: 2.10, barcode: "2001000800012", minimumStock: 10, unit: "pcs" },
   ],
   "Bottled Water": [
     { name: "Bottled Water 500ml", costPrice: 0.15, sellingPrice: 0.25, barcode: "2001000900001", minimumStock: 24, unit: "pcs" },
@@ -128,8 +153,10 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Sparkling Water 500ml", costPrice: 0.50, sellingPrice: 0.80, barcode: "2001000900004", minimumStock: 12, unit: "pcs" },
     { name: "Flavored Water 500ml", costPrice: 0.40, sellingPrice: 0.70, barcode: "2001000900005", minimumStock: 12, unit: "pcs" },
     { name: "Spring Water 10L", costPrice: 1.00, sellingPrice: 1.60, barcode: "2001000900006", minimumStock: 4, unit: "pcs" },
-    { name: "Coconut Water 330ml", costPrice: 0.60, sellingPrice: 1.00, barcode: "2001000900007", minimumStock: 12, unit: "pcs" },
-    { name: "Vitamin Water 500ml", costPrice: 0.70, sellingPrice: 1.20, barcode: "2001000900008", minimumStock: 10, unit: "pcs" },
+    { name: "Vitamin Water 500ml", costPrice: 0.70, sellingPrice: 1.20, barcode: "2001000900007", minimumStock: 10, unit: "pcs" },
+    { name: "Tonic Water 330ml", costPrice: 0.50, sellingPrice: 0.80, barcode: "2001000900008", minimumStock: 12, unit: "pcs" },
+    { name: "Ginger Ale 330ml", costPrice: 0.45, sellingPrice: 0.75, barcode: "2001000900009", minimumStock: 12, unit: "pcs" },
+    { name: "Soda Water 330ml", costPrice: 0.40, sellingPrice: 0.65, barcode: "2001000900010", minimumStock: 12, unit: "pcs" },
   ],
   "Personal Care": [
     { name: "Bath Soap 100g", costPrice: 0.40, sellingPrice: 0.70, barcode: "2001001000001", minimumStock: 20, unit: "pcs" },
@@ -142,6 +169,9 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Toothbrush", costPrice: 0.60, sellingPrice: 1.00, barcode: "2001001000008", minimumStock: 20, unit: "pcs" },
     { name: "Moisturizer 100ml", costPrice: 2.00, sellingPrice: 3.50, barcode: "2001001000009", minimumStock: 8, unit: "pcs" },
     { name: "Sunscreen 100ml", costPrice: 3.00, sellingPrice: 5.00, barcode: "2001001000010", minimumStock: 8, unit: "pcs" },
+    { name: "Facial Cleanser 150ml", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001001000011", minimumStock: 8, unit: "pcs" },
+    { name: "Lip Balm", costPrice: 0.50, sellingPrice: 1.00, barcode: "2001001000012", minimumStock: 20, unit: "pcs" },
+    { name: "Hair Gel 200ml", costPrice: 1.50, sellingPrice: 2.50, barcode: "2001001000013", minimumStock: 10, unit: "pcs" },
   ],
   "Cleaning Supplies": [
     { name: "Laundry Detergent 1kg", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001001100001", minimumStock: 10, unit: "pcs" },
@@ -154,6 +184,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Scouring Sponge 5pk", costPrice: 0.60, sellingPrice: 1.00, barcode: "2001001100008", minimumStock: 20, unit: "pcs" },
     { name: "Scouring Powder 500g", costPrice: 0.80, sellingPrice: 1.30, barcode: "2001001100009", minimumStock: 15, unit: "pcs" },
     { name: "Fabric Softener 1L", costPrice: 1.80, sellingPrice: 2.80, barcode: "2001001100010", minimumStock: 10, unit: "pcs" },
+    { name: "Air Freshener 300ml", costPrice: 1.50, sellingPrice: 2.50, barcode: "2001001100011", minimumStock: 10, unit: "pcs" },
+    { name: "Stain Remover 500ml", costPrice: 2.00, sellingPrice: 3.20, barcode: "2001001100012", minimumStock: 8, unit: "pcs" },
   ],
   "Canned Foods": [
     { name: "Canned Tuna 185g", costPrice: 1.20, sellingPrice: 1.90, barcode: "2001001200001", minimumStock: 15, unit: "pcs" },
@@ -166,6 +198,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Canned Peas 300g", costPrice: 0.70, sellingPrice: 1.10, barcode: "2001001200008", minimumStock: 12, unit: "pcs" },
     { name: "Canned Mushrooms 200g", costPrice: 1.10, sellingPrice: 1.80, barcode: "2001001200009", minimumStock: 10, unit: "pcs" },
     { name: "Canned Fruit Cocktail 400g", costPrice: 1.30, sellingPrice: 2.10, barcode: "2001001200010", minimumStock: 10, unit: "pcs" },
+    { name: "Canned Chicken 185g", costPrice: 1.50, sellingPrice: 2.40, barcode: "2001001200011", minimumStock: 10, unit: "pcs" },
+    { name: "Canned Coconut Cream 400ml", costPrice: 1.20, sellingPrice: 1.90, barcode: "2001001200012", minimumStock: 8, unit: "pcs" },
   ],
   Electronics: [
     { name: "AA Batteries 4pk", costPrice: 1.00, sellingPrice: 1.80, barcode: "2001001300001", minimumStock: 15, unit: "pcs" },
@@ -178,6 +212,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Extension Cord 3m", costPrice: 3.00, sellingPrice: 5.00, barcode: "2001001300008", minimumStock: 6, unit: "pcs" },
     { name: "Wired Mouse", costPrice: 3.00, sellingPrice: 5.00, barcode: "2001001300009", minimumStock: 6, unit: "pcs" },
     { name: "Wired Keyboard", costPrice: 5.00, sellingPrice: 8.00, barcode: "2001001300010", minimumStock: 6, unit: "pcs" },
+    { name: "HDMI Cable 2m", costPrice: 3.00, sellingPrice: 5.00, barcode: "2001001300011", minimumStock: 8, unit: "pcs" },
+    { name: "Bluetooth Speaker", costPrice: 10.00, sellingPrice: 18.00, barcode: "2001001300012", minimumStock: 4, unit: "pcs" },
   ],
   Stationery: [
     { name: "Ballpoint Pen 10pk", costPrice: 0.80, sellingPrice: 1.30, barcode: "2001001400001", minimumStock: 15, unit: "pcs" },
@@ -190,6 +226,8 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Permanent Marker 4pk", costPrice: 1.00, sellingPrice: 1.70, barcode: "2001001400008", minimumStock: 10, unit: "pcs" },
     { name: "Glue Stick", costPrice: 0.30, sellingPrice: 0.60, barcode: "2001001400009", minimumStock: 20, unit: "pcs" },
     { name: "Scissors", costPrice: 0.80, sellingPrice: 1.40, barcode: "2001001400010", minimumStock: 10, unit: "pcs" },
+    { name: "Calculator", costPrice: 3.00, sellingPrice: 5.00, barcode: "2001001400011", minimumStock: 6, unit: "pcs" },
+    { name: "Stapler", costPrice: 2.00, sellingPrice: 3.50, barcode: "2001001400012", minimumStock: 8, unit: "pcs" },
   ],
   "Baby Products": [
     { name: "Baby Diapers Size 3 30pk", costPrice: 5.00, sellingPrice: 8.00, barcode: "2001001500001", minimumStock: 5, unit: "pcs" },
@@ -202,40 +240,116 @@ const productsByCategory: Record<string, { name: string; costPrice: number; sell
     { name: "Baby Food Jar 120g", costPrice: 1.00, sellingPrice: 1.70, barcode: "2001001500008", minimumStock: 15, unit: "pcs" },
     { name: "Baby Cereal 250g", costPrice: 2.00, sellingPrice: 3.20, barcode: "2001001500009", minimumStock: 10, unit: "pcs" },
     { name: "Baby Bottle 250ml", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001001500010", minimumStock: 8, unit: "pcs" },
+    { name: "Teething Ring", costPrice: 1.50, sellingPrice: 2.80, barcode: "2001001500011", minimumStock: 10, unit: "pcs" },
+    { name: "Baby Spoon Set 4pk", costPrice: 2.00, sellingPrice: 3.50, barcode: "2001001500012", minimumStock: 8, unit: "pcs" },
+  ],
+  "Frozen Foods": [
+    { name: "Frozen Chicken Legs 1kg", costPrice: 3.50, sellingPrice: 5.50, barcode: "2001001600001", minimumStock: 8, unit: "pcs" },
+    { name: "Frozen Chicken Breast 500g", costPrice: 3.00, sellingPrice: 4.80, barcode: "2001001600002", minimumStock: 8, unit: "pcs" },
+    { name: "Frozen Whole Chicken 1.5kg", costPrice: 4.50, sellingPrice: 7.00, barcode: "2001001600003", minimumStock: 6, unit: "pcs" },
+    { name: "Frozen Beef Mince 500g", costPrice: 3.20, sellingPrice: 5.00, barcode: "2001001600004", minimumStock: 8, unit: "pcs" },
+    { name: "Frozen Fish Fillet 500g", costPrice: 3.50, sellingPrice: 5.50, barcode: "2001001600005", minimumStock: 6, unit: "pcs" },
+    { name: "Frozen Mixed Vegetables 500g", costPrice: 1.50, sellingPrice: 2.50, barcode: "2001001600006", minimumStock: 10, unit: "pcs" },
+    { name: "Frozen Green Peas 400g", costPrice: 1.20, sellingPrice: 2.00, barcode: "2001001600007", minimumStock: 10, unit: "pcs" },
+    { name: "Frozen French Fries 1kg", costPrice: 2.00, sellingPrice: 3.20, barcode: "2001001600008", minimumStock: 8, unit: "pcs" },
+    { name: "Frozen Pizza 350g", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001001600009", minimumStock: 6, unit: "pcs" },
+    { name: "Frozen Spring Rolls 300g", costPrice: 1.80, sellingPrice: 3.00, barcode: "2001001600010", minimumStock: 8, unit: "pcs" },
+    { name: "Frozen Samosa 500g", costPrice: 2.00, sellingPrice: 3.50, barcode: "2001001600011", minimumStock: 8, unit: "pcs" },
+    { name: "Frozen Shrimp 400g", costPrice: 5.00, sellingPrice: 8.00, barcode: "2001001600012", minimumStock: 5, unit: "pcs" },
+  ],
+  "Meat & Poultry": [
+    { name: "Fresh Chicken Breast 1kg", costPrice: 4.00, sellingPrice: 6.00, barcode: "2001001700001", minimumStock: 8, unit: "pcs" },
+    { name: "Fresh Chicken Thighs 1kg", costPrice: 3.50, sellingPrice: 5.50, barcode: "2001001700002", minimumStock: 8, unit: "pcs" },
+    { name: "Fresh Beef Steak 500g", costPrice: 5.00, sellingPrice: 8.00, barcode: "2001001700003", minimumStock: 6, unit: "pcs" },
+    { name: "Fresh Beef Mince 500g", costPrice: 3.50, sellingPrice: 5.50, barcode: "2001001700004", minimumStock: 8, unit: "pcs" },
+    { name: "Fresh Lamb Chops 500g", costPrice: 6.00, sellingPrice: 9.50, barcode: "2001001700005", minimumStock: 5, unit: "pcs" },
+    { name: "Fresh Goat Meat 1kg", costPrice: 5.50, sellingPrice: 8.50, barcode: "2001001700006", minimumStock: 5, unit: "pcs" },
+    { name: "Fresh Tilapia Fish 1kg", costPrice: 3.00, sellingPrice: 5.00, barcode: "2001001700007", minimumStock: 6, unit: "pcs" },
+    { name: "Fresh Salmon Fillet 500g", costPrice: 6.50, sellingPrice: 10.00, barcode: "2001001700008", minimumStock: 4, unit: "pcs" },
+    { name: "Beef Sausages 500g", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001001700009", minimumStock: 8, unit: "pcs" },
+    { name: "Chicken Sausages 500g", costPrice: 2.00, sellingPrice: 3.50, barcode: "2001001700010", minimumStock: 8, unit: "pcs" },
+    { name: "Beef Liver 500g", costPrice: 2.00, sellingPrice: 3.00, barcode: "2001001700011", minimumStock: 6, unit: "pcs" },
+    { name: "Whole Turkey 4-5kg", costPrice: 12.00, sellingPrice: 18.00, barcode: "2001001700012", minimumStock: 3, unit: "pcs" },
+  ],
+  "Spices & Seasonings": [
+    { name: "Black Pepper 100g", costPrice: 1.00, sellingPrice: 1.80, barcode: "2001001800001", minimumStock: 10, unit: "pcs" },
+    { name: "Cinnamon Sticks 50g", costPrice: 1.20, sellingPrice: 2.00, barcode: "2001001800002", minimumStock: 10, unit: "pcs" },
+    { name: "Turmeric Powder 100g", costPrice: 0.80, sellingPrice: 1.40, barcode: "2001001800003", minimumStock: 10, unit: "pcs" },
+    { name: "Cumin Seeds 100g", costPrice: 0.90, sellingPrice: 1.50, barcode: "2001001800004", minimumStock: 10, unit: "pcs" },
+    { name: "Coriander Powder 100g", costPrice: 0.70, sellingPrice: 1.30, barcode: "2001001800005", minimumStock: 10, unit: "pcs" },
+    { name: "Paprika 100g", costPrice: 1.00, sellingPrice: 1.70, barcode: "2001001800006", minimumStock: 10, unit: "pcs" },
+    { name: "Garam Masala 100g", costPrice: 1.20, sellingPrice: 2.00, barcode: "2001001800007", minimumStock: 8, unit: "pcs" },
+    { name: "Mixed Spice 75g", costPrice: 0.80, sellingPrice: 1.40, barcode: "2001001800008", minimumStock: 10, unit: "pcs" },
+    { name: "Salt 1kg", costPrice: 0.30, sellingPrice: 0.50, barcode: "2001001800009", minimumStock: 25, unit: "pcs" },
+    { name: "Seasoning Cubes 24pk", costPrice: 0.60, sellingPrice: 1.00, barcode: "2001001800010", minimumStock: 20, unit: "pcs" },
+  ],
+  "Cereals & Breakfast": [
+    { name: "Corn Flakes 500g", costPrice: 2.00, sellingPrice: 3.50, barcode: "2001001900001", minimumStock: 8, unit: "pcs" },
+    { name: "Oatmeal 1kg", costPrice: 1.80, sellingPrice: 3.00, barcode: "2001001900002", minimumStock: 8, unit: "pcs" },
+    { name: "Granola 500g", costPrice: 3.00, sellingPrice: 5.00, barcode: "2001001900003", minimumStock: 6, unit: "pcs" },
+    { name: "Muesli 500g", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001001900004", minimumStock: 6, unit: "pcs" },
+    { name: "Pancake Mix 400g", costPrice: 1.50, sellingPrice: 2.50, barcode: "2001001900005", minimumStock: 8, unit: "pcs" },
+    { name: "Cereal Bar 6pk", costPrice: 1.80, sellingPrice: 3.00, barcode: "2001001900006", minimumStock: 10, unit: "pcs" },
+    { name: "Instant Noodles 5pk", costPrice: 1.00, sellingPrice: 1.80, barcode: "2001001900007", minimumStock: 15, unit: "pcs" },
+    { name: "Fruit Jam 400g", costPrice: 2.00, sellingPrice: 3.20, barcode: "2001001900008", minimumStock: 8, unit: "pcs" },
+    { name: "Peanut Butter 400g", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001001900009", minimumStock: 8, unit: "pcs" },
+    { name: "Chocolate Spread 400g", costPrice: 2.50, sellingPrice: 4.00, barcode: "2001001900010", minimumStock: 8, unit: "pcs" },
+    { name: "Marmalade 400g", costPrice: 1.80, sellingPrice: 3.00, barcode: "2001001900011", minimumStock: 8, unit: "pcs" },
+    { name: "Honey Oat Bars 5pk", costPrice: 2.00, sellingPrice: 3.50, barcode: "2001001900012", minimumStock: 10, unit: "pcs" },
   ],
 }
 
 const customerData = [
-  { firstName: "Hodan", lastName: "Mohamed", phone: "+252612345601" },
-  { firstName: "Abdirahman", lastName: "Hassan", phone: "+252612345602" },
-  { firstName: "Fartun", lastName: "Ali", phone: "+252612345603" },
-  { firstName: "Mohamud", lastName: "Ahmed", phone: "+252612345604" },
-  { firstName: "Asha", lastName: "Ibrahim", phone: "+252612345605" },
-  { firstName: "Khadar", lastName: "Hussein", phone: "+252612345606" },
-  { firstName: "Safiya", lastName: "Omar", phone: "+252612345607" },
-  { firstName: "Yusuf", lastName: "Osman", phone: "+252612345608" },
-  { firstName: "Maryan", lastName: "Abdullahi", phone: "+252612345609" },
-  { firstName: "Hassan", lastName: "Farah", phone: "+252612345610" },
-  { firstName: "Amina", lastName: "Nor", phone: "+252612345611" },
-  { firstName: "Shukri", lastName: "Abdi", phone: "+252612345612" },
-  { firstName: "Ahmed", lastName: "Aden", phone: "+252612345613" },
-  { firstName: "Halimo", lastName: "Ismail", phone: "+252612345614" },
-  { firstName: "Dahir", lastName: "Ali", phone: "+252612345615" },
-  { firstName: "Nasteho", lastName: "Jama", phone: "+252612345616" },
-  { firstName: "Abdiweli", lastName: "Mohamed", phone: "+252612345617" },
-  { firstName: "Khadijo", lastName: "Salad", phone: "+252612345618" },
-  { firstName: "Jamal", lastName: "Hassan", phone: "+252612345619" },
-  { firstName: "Rahma", lastName: "Yusuf", phone: "+252612345620" },
-  { firstName: "Farhiya", lastName: "Ali", phone: "+252612345621" },
-  { firstName: "Mohamed", lastName: "Nur", phone: "+252612345622" },
-  { firstName: "Saida", lastName: "Hussein", phone: "+252612345623" },
-  { firstName: "Ibrahim", lastName: "Osman", phone: "+252612345624" },
-  { firstName: "Zeinab", lastName: "Ahmed", phone: "+252612345625" },
-  { firstName: "Abdullahi", lastName: "Abdi", phone: "+252612345626" },
-  { firstName: "Siham", lastName: "Farah", phone: "+252612345627" },
-  { firstName: "Mohamud", lastName: "Cali", phone: "+252612345628" },
-  { firstName: "Fadumo", lastName: "Jama", phone: "+252612345629" },
-  { firstName: "Zakaria", lastName: "Ali", phone: "+252612345630" },
+  { firstName: "Hodan", lastName: "Mohamed", phone: "+252612345601", highSpender: true },
+  { firstName: "Abdirahman", lastName: "Hassan", phone: "+252612345602", highSpender: true },
+  { firstName: "Fartun", lastName: "Ali", phone: "+252612345603", highSpender: true },
+  { firstName: "Mohamud", lastName: "Ahmed", phone: "+252612345604", highSpender: true },
+  { firstName: "Asha", lastName: "Ibrahim", phone: "+252612345605", highSpender: true },
+  { firstName: "Khadar", lastName: "Hussein", phone: "+252612345606", highSpender: true },
+  { firstName: "Safiya", lastName: "Omar", phone: "+252612345607", highSpender: true },
+  { firstName: "Yusuf", lastName: "Osman", phone: "+252612345608", highSpender: true },
+  { firstName: "Maryan", lastName: "Abdullahi", phone: "+252612345609", highSpender: true },
+  { firstName: "Hassan", lastName: "Farah", phone: "+252612345610", highSpender: true },
+  { firstName: "Amina", lastName: "Nor", phone: "+252612345611", highSpender: false },
+  { firstName: "Shukri", lastName: "Abdi", phone: "+252612345612", highSpender: false },
+  { firstName: "Ahmed", lastName: "Aden", phone: "+252612345613", highSpender: false },
+  { firstName: "Halimo", lastName: "Ismail", phone: "+252612345614", highSpender: false },
+  { firstName: "Dahir", lastName: "Ali", phone: "+252612345615", highSpender: false },
+  { firstName: "Nasteho", lastName: "Jama", phone: "+252612345616", highSpender: false },
+  { firstName: "Abdiweli", lastName: "Mohamed", phone: "+252612345617", highSpender: false },
+  { firstName: "Khadijo", lastName: "Salad", phone: "+252612345618", highSpender: false },
+  { firstName: "Jamal", lastName: "Hassan", phone: "+252612345619", highSpender: false },
+  { firstName: "Rahma", lastName: "Yusuf", phone: "+252612345620", highSpender: false },
+  { firstName: "Farhiya", lastName: "Ali", phone: "+252612345621", highSpender: false },
+  { firstName: "Mohamed", lastName: "Nur", phone: "+252612345622", highSpender: false },
+  { firstName: "Saida", lastName: "Hussein", phone: "+252612345623", highSpender: false },
+  { firstName: "Ibrahim", lastName: "Osman", phone: "+252612345624", highSpender: false },
+  { firstName: "Zeinab", lastName: "Ahmed", phone: "+252612345625", highSpender: false },
+  { firstName: "Abdullahi", lastName: "Abdi", phone: "+252612345626", highSpender: false },
+  { firstName: "Siham", lastName: "Farah", phone: "+252612345627", highSpender: false },
+  { firstName: "Mohamud", lastName: "Cali", phone: "+252612345628", highSpender: false },
+  { firstName: "Fadumo", lastName: "Jama", phone: "+252612345629", highSpender: false },
+  { firstName: "Zakaria", lastName: "Ali", phone: "+252612345630", highSpender: false },
+  { firstName: "Hamdi", lastName: "Hassan", phone: "+252612345631", highSpender: false },
+  { firstName: "Khalid", lastName: "Omar", phone: "+252612345632", highSpender: false },
+  { firstName: "Muna", lastName: "Abdi", phone: "+252612345633", highSpender: false },
+  { firstName: "Mustafa", lastName: "Mohamed", phone: "+252612345634", highSpender: false },
+  { firstName: "Suhayb", lastName: "Hussein", phone: "+252612345635", highSpender: false },
+  { firstName: "Naima", lastName: "Yusuf", phone: "+252612345636", highSpender: false },
+  { firstName: "Idil", lastName: "Ahmed", phone: "+252612345637", highSpender: false },
+  { firstName: "Liban", lastName: "Ali", phone: "+252612345638", highSpender: false },
+  { firstName: "Sahra", lastName: "Mohamed", phone: "+252612345639", highSpender: false },
+  { firstName: "Yahya", lastName: "Hassan", phone: "+252612345640", highSpender: false },
+  { firstName: "Anisa", lastName: "Omar", phone: "+252612345641", highSpender: false },
+  { firstName: "Jama", lastName: "Ali", phone: "+252612345642", highSpender: false },
+  { firstName: "Sadiya", lastName: "Hussein", phone: "+252612345643", highSpender: false },
+  { firstName: "Faisal", lastName: "Abdi", phone: "+252612345644", highSpender: false },
+  { firstName: "Kawsar", lastName: "Mohamed", phone: "+252612345645", highSpender: false },
+  { firstName: "Mukhtar", lastName: "Ali", phone: "+252612345646", highSpender: false },
+  { firstName: "Hawa", lastName: "Jama", phone: "+252612345647", highSpender: false },
+  { firstName: "Ayaan", lastName: "Hussein", phone: "+252612345648", highSpender: false },
+  { firstName: "Nasir", lastName: "Omar", phone: "+252612345649", highSpender: false },
+  { firstName: "Samira", lastName: "Mohamed", phone: "+252612345650", highSpender: false },
 ]
 
 const supplierData = [
@@ -254,36 +368,70 @@ const supplierData = [
   { name: "Shamso Tea & Coffee Ltd", phone: "+252612345713", email: "info@shamsotea.so", address: "Mogadishu, Somalia" },
   { name: "CleanHome Supplies", phone: "+252612345714", email: "sales@cleanhome.so", address: "Mogadishu, Somalia" },
   { name: "Premium Foods Distributor", phone: "+252612345715", email: "info@premiumfoods.so", address: "Mogadishu, Somalia" },
+  { name: "Somalia Cold Storage Ltd", phone: "+252612345716", email: "cold@coldstorage.so", address: "Mogadishu, Somalia" },
+  { name: "Fresh Meat Suppliers", phone: "+252612345717", email: "sales@freshmeat.so", address: "Mogadishu, Somalia" },
+  { name: "Spice World Somalia", phone: "+252612345718", email: "info@spiceworld.so", address: "Mogadishu, Somalia" },
+  { name: "Breakfast Foods Co.", phone: "+252612345719", email: "orders@breakfastco.so", address: "Mogadishu, Somalia" },
 ]
 
-function randomInt(min: number, max: number) {
-  return Math.floor(Math.random() * (max - min + 1)) + min
+function randomInt(min: number, max: number) { return Math.floor(Math.random() * (max - min + 1)) + min }
+
+function randomFloat(min: number, max: number, decimals = 2) { return parseFloat((Math.random() * (max - min) + min).toFixed(decimals)) }
+
+function randomElement<T>(arr: readonly T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
+
+function weightedRandomElement(arr: string[], weights: number[]): string {
+  const total = weights.reduce((a, b) => a + b, 0)
+  let r = Math.random() * total
+  for (let i = 0; i < arr.length; i++) {
+    r -= weights[i]
+    if (r <= 0) return arr[i]
+  }
+  return arr[arr.length - 1]
 }
 
-function randomFloat(min: number, max: number, decimals = 2) {
-  return parseFloat((Math.random() * (max - min) + min).toFixed(decimals))
+function weightedCustomer(customers: { id: string; highSpender: boolean }[]): string {
+  const weights = customers.map(c => c.highSpender ? 3 : 1)
+  return weightedRandomElement(customers.map(c => c.id), weights)
 }
 
-function randomElement<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
-}
-
-function randomDate(start: Date, end: Date) {
-  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()))
-}
+function randomDate(start: Date, end: Date) { return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())) }
 
 function generateId(existing: Set<string>): string {
-  let id: string
-  do {
-    id = crypto.randomUUID()
-  } while (existing.has(id))
-  existing.add(id)
-  return id
+  let id: string; do { id = crypto.randomUUID() } while (existing.has(id)); existing.add(id); return id
+}
+
+function assignStock(index: number, total: number): number {
+  if (index < total * 0.08) return 0
+  if (index < total * 0.20) return randomInt(1, 5)
+  if (index < total * 0.65) return randomInt(20, 100)
+  return randomInt(120, 350)
+}
+
+function productImageUrl(barcode: string, name: string): string {
+  const keyword = name.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30)
+  return `https://picsum.photos/seed/${barcode}/200/200`
+}
+
+async function clearStoreData(storeId: string) {
+  await prisma.$transaction([
+    prisma.inventoryTransaction.deleteMany({ where: { storeId } }),
+    prisma.saleItem.deleteMany({ where: { sale: { storeId } } }),
+    prisma.sale.deleteMany({ where: { storeId } }),
+    prisma.purchaseItem.deleteMany({ where: { purchase: { storeId } } }),
+    prisma.purchase.deleteMany({ where: { storeId } }),
+    prisma.productUnit.deleteMany({ where: { product: { storeId } } }),
+    prisma.product.deleteMany({ where: { storeId } }),
+    prisma.customer.deleteMany({ where: { storeId } }),
+    prisma.supplier.deleteMany({ where: { storeId } }),
+    prisma.category.deleteMany({ where: { storeId } }),
+    prisma.backup.deleteMany({ where: { storeId } }),
+  ])
 }
 
 const baseSaleNumber = 1000
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const auth = await requireRole("OWNER")
   if (auth instanceof NextResponse) return auth
 
@@ -293,26 +441,32 @@ export async function POST() {
   const storeId = store.id
   const userId = auth.userId
   const existingIds = new Set<string>()
+  const { searchParams } = new URL(req.url)
+  const force = searchParams.get("force") === "true"
 
   try {
-    const existingData = await Promise.all([
-      prisma.inventoryTransaction.count({ where: { storeId } }),
-      prisma.saleItem.count({ where: { sale: { storeId } } }),
-      prisma.sale.count({ where: { storeId } }),
-      prisma.purchaseItem.count({ where: { purchase: { storeId } } }),
-      prisma.purchase.count({ where: { storeId } }),
-      prisma.product.count({ where: { storeId } }),
-      prisma.customer.count({ where: { storeId } }),
-      prisma.supplier.count({ where: { storeId } }),
-      prisma.category.count({ where: { storeId } }),
-      prisma.backup.count({ where: { storeId } }),
-    ])
-    const total = existingData.reduce((a, b) => a + b, 0)
-    if (total > 0) {
-      return NextResponse.json(
-        { success: false, error: "Store already has data. Please use a fresh account or contact support." },
-        { status: 409 }
-      )
+    if (!force) {
+      const existingData = await Promise.all([
+        prisma.inventoryTransaction.count({ where: { storeId } }),
+        prisma.saleItem.count({ where: { sale: { storeId } } }),
+        prisma.sale.count({ where: { storeId } }),
+        prisma.purchaseItem.count({ where: { purchase: { storeId } } }),
+        prisma.purchase.count({ where: { storeId } }),
+        prisma.product.count({ where: { storeId } }),
+        prisma.customer.count({ where: { storeId } }),
+        prisma.supplier.count({ where: { storeId } }),
+        prisma.category.count({ where: { storeId } }),
+        prisma.backup.count({ where: { storeId } }),
+      ])
+      const total = existingData.reduce((a, b) => a + b, 0)
+      if (total > 0) {
+        return NextResponse.json(
+          { success: false, error: "Store already has data. Use ?force=true to reset." },
+          { status: 409 }
+        )
+      }
+    } else {
+      await clearStoreData(storeId)
     }
 
     await prisma.store.update({
@@ -338,23 +492,24 @@ export async function POST() {
       createdAt: new Date(), updatedAt: new Date(),
     }))
     await prisma.category.createMany({ data: categories })
-
     const catMap = new Map(categories.map(c => [c.name, c.id]))
 
-    const products = Object.entries(productsByCategory).flatMap(([catName, prods]) => {
-      const catId = catMap.get(catName)!
-      return prods.map(p => ({
-        id: generateId(existingIds), storeId, categoryId: catId,
-        name: p.name, barcode: p.barcode, sku: p.barcode,
-        costPrice: p.costPrice, sellingPrice: p.sellingPrice,
-        stockQuantity: 200, minimumStock: p.minimumStock, unit: p.unit,
-        isActive: true, brand: null, image: null, description: null,
-        expiryDate: null, isPharmacyItem: false, requiresPrescription: false,
-        createdAt: new Date(), updatedAt: new Date(),
-      }))
-    })
-    await prisma.product.createMany({ data: products })
+    const allRawProducts = Object.entries(productsByCategory).flatMap(([catName, prods]) =>
+      prods.map((p, idx) => ({ ...p, catName, idx }))
+    )
+    const totalProducts = allRawProducts.length
 
+    const products = allRawProducts.map((p, i) => ({
+      id: generateId(existingIds), storeId, categoryId: catMap.get(p.catName)!,
+      name: p.name, barcode: p.barcode, sku: p.barcode,
+      costPrice: p.costPrice, sellingPrice: p.sellingPrice,
+      stockQuantity: assignStock(i, totalProducts),
+      minimumStock: p.minimumStock, unit: p.unit,
+      isActive: true, brand: null, image: productImageUrl(p.barcode, p.name), description: null,
+      expiryDate: null, isPharmacyItem: false, requiresPrescription: false,
+      createdAt: new Date(), updatedAt: new Date(),
+    }))
+    await prisma.product.createMany({ data: products })
     const productMap = new Map(products.map(p => [p.id, p]))
 
     const customers = customerData.map((c, i) => ({
@@ -365,10 +520,14 @@ export async function POST() {
       email: `${c.firstName.toLowerCase()}.${c.lastName.toLowerCase()}@example.com`,
       address: "Mogadishu, Somalia", city: "Mogadishu",
       companyName: null, notes: null,
-      creditLimit: randomFloat(50, 500), currentBalance: 0, isActive: true,
+      creditLimit: c.highSpender ? randomFloat(200, 800) : randomFloat(30, 150),
+      currentBalance: c.highSpender ? randomFloat(0, 100) : randomFloat(0, 30),
+      isActive: true,
       createdAt: new Date(), updatedAt: new Date(),
     }))
     await prisma.customer.createMany({ data: customers })
+
+    const customersWithMeta = customers.map((c, i) => ({ ...c, highSpender: customerData[i].highSpender }))
 
     const suppliers = supplierData.map(s => ({
       id: generateId(existingIds), storeId,
@@ -378,7 +537,7 @@ export async function POST() {
     await prisma.supplier.createMany({ data: suppliers })
 
     const supplierIds = suppliers.map(s => s.id)
-    const customerIds = customers.map(c => c.id)
+    const customerIds = customersWithMeta.map(c => c.id)
     const allProductIds = products.map(p => p.id)
 
     const purchaseStart = new Date("2025-08-01")
@@ -397,7 +556,6 @@ export async function POST() {
       const itemCount = randomInt(3, 8)
       let purTotal = 0
       const selectedProducts = new Set<string>()
-      const items: typeof allPurchaseItems = []
 
       for (let j = 0; j < itemCount; j++) {
         let prodId: string
@@ -407,8 +565,13 @@ export async function POST() {
         const qty = randomInt(10, 60)
         const costPrice = prod.costPrice ?? 0
         purTotal += qty * costPrice
-        const itemId = generateId(existingIds)
-        items.push({ id: itemId, purchaseId: purId, productId: prodId, productName: prod.name, quantity: qty, costPrice, unitName: prod.unit ?? "pcs", unitConversionFactor: 1, createdAt: date, updatedAt: date })
+
+        allPurchaseItems.push({
+          id: generateId(existingIds), purchaseId: purId, productId: prodId,
+          productName: prod.name, quantity: qty, costPrice,
+          unitName: prod.unit ?? "pcs", unitConversionFactor: 1,
+          createdAt: date, updatedAt: date,
+        })
 
         const prevStock = prod.stockQuantity
         prod.stockQuantity += qty
@@ -421,14 +584,13 @@ export async function POST() {
         })
       }
 
-      purTotal = parseFloat(purTotal.toFixed(2))
-
       purchases.push({
-        id: purId, storeId, supplierId: supplier.id, supplierName: supplier.name, invoiceNumber,
-        total: purTotal, notes: null, status: "COMPLETED",
+        id: purId, storeId, supplierId: supplier.id,
+        supplierName: supplier.name, invoiceNumber,
+        total: parseFloat(purTotal.toFixed(2)),
+        notes: null, status: "COMPLETED",
         createdAt: date, updatedAt: date,
       })
-      allPurchaseItems.push(...items)
     }
     await prisma.purchase.createMany({ data: purchases })
     await prisma.purchaseItem.createMany({ data: allPurchaseItems })
@@ -454,13 +616,19 @@ export async function POST() {
     const targetSales = 520
 
     const saleBatchData: any[] = []
+    const highSpenderCustomers = customersWithMeta.filter(c => c.highSpender)
+    const lowSpenderCustomers = customersWithMeta.filter(c => !c.highSpender)
+    const highIds = highSpenderCustomers.map(c => c.id)
+    const lowIds = lowSpenderCustomers.map(c => c.id)
 
     for (let i = 0; i < targetSales; i++) {
       const saleId = generateId(existingIds)
       const saleNum = baseSaleNumber + i
       const saleNumber = `SALE-${saleNum.toString().padStart(6, "0")}`
       const date = randomDate(saleStart, saleEnd)
-      const customerId = Math.random() < 0.7 ? randomElement(customerIds) : null
+      const customerId = Math.random() < 0.7
+        ? (Math.random() < 0.4 ? randomElement(highIds) : randomElement(lowIds))
+        : null
 
       const itemCount = randomInt(2, 5)
       let subtotal = 0
@@ -504,7 +672,7 @@ export async function POST() {
       subtotal = parseFloat(subtotal.toFixed(2))
       const tax = parseFloat(((subtotal - saleDiscount) * 0.05).toFixed(2))
       const grandTotal = parseFloat((subtotal - saleDiscount + tax).toFixed(2))
-      const paymentMethod = randomElement(paymentMethods)
+      const paymentMethod = randomElement(PAYMENT_WEIGHTS)
       const changeGiven = paymentMethod === "CASH" ? randomFloat(0, 5, 2) : 0
       const amountPaid = parseFloat((grandTotal + changeGiven).toFixed(2))
 
@@ -522,9 +690,9 @@ export async function POST() {
 
     for (let i = 0; i < saleBatchData.length; i += BATCH_SIZE) {
       const batch = saleBatchData.slice(i, i + BATCH_SIZE)
-      await prisma.sale.createMany({ data: batch.map(b => b.sale) })
-      await prisma.saleItem.createMany({ data: batch.flatMap(b => b.items) })
-      await prisma.inventoryTransaction.createMany({ data: batch.flatMap(b => b.transactions) })
+      await prisma.sale.createMany({ data: batch.map((b: any) => b.sale) })
+      await prisma.saleItem.createMany({ data: batch.flatMap((b: any) => b.items) })
+      await prisma.inventoryTransaction.createMany({ data: batch.flatMap((b: any) => b.transactions) })
     }
 
     const stockUpdates = products.map(p => prisma.product.update({
@@ -535,18 +703,18 @@ export async function POST() {
 
     const backupData = {
       seedVersion: "1.0", seededAt: new Date().toISOString(),
+      store: "Barwaaqo Supermarket",
       summary: {
         categories: categories.length, products: products.length,
         customers: customers.length, suppliers: suppliers.length,
         purchases: purchases.length, purchaseItems: allPurchaseItems.length,
         sales: saleBatchData.length,
-        saleItems: saleBatchData.reduce((sum, b) => sum + b.items.length, 0),
-        inventoryTransactions: invTransactionsPurchase.length + initialInvTransactions.length + saleBatchData.reduce((sum, b) => sum + b.transactions.length, 0),
+        saleItems: saleBatchData.reduce((sum: number, b: any) => sum + b.items.length, 0),
+        inventoryTransactions: invTransactionsPurchase.length + initialInvTransactions.length + saleBatchData.reduce((sum: number, b: any) => sum + b.transactions.length, 0),
       },
     }
     const dataJson = JSON.stringify(backupData)
-    const dateStr = new Date().toISOString().replace(/[:.]/g, "-")
-    const filename = `retailpos-demo-backup-${dateStr}.json`
+    const filename = "Initial Demo Backup - Barwaaqo Supermarket"
     const size = `${(dataJson.length / 1024).toFixed(2)} KB`
 
     await prisma.backup.create({
@@ -559,14 +727,22 @@ export async function POST() {
       purchases: purchases.length, sales: saleBatchData.length,
     })
 
+    const outOfStock = products.filter(p => p.stockQuantity === 0).length
+    const lowStock = products.filter(p => p.stockQuantity > 0 && p.stockQuantity <= p.minimumStock).length
+
     return NextResponse.json({
       success: true,
       message: "Barwaaqo Supermarket demo store seeded successfully!",
       summary: {
         store: "Barwaaqo Supermarket",
-        categories: categories.length, products: products.length,
-        customers: customers.length, suppliers: suppliers.length,
-        purchases: purchases.length, sales: saleBatchData.length,
+        categories: categories.length,
+        products: products.length,
+        outOfStock,
+        lowStockAlert: lowStock,
+        customers: customers.length,
+        suppliers: suppliers.length,
+        purchases: purchases.length,
+        sales: saleBatchData.length,
         backup: filename,
       },
     })
