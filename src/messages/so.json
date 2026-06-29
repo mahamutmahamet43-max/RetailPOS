@@ -463,7 +463,15 @@
     "failedFetchBackupData": "Kuma guulaysan helista xogta kaydinta",
     "failedDeleteBackup": "Kuma guulaysan tirtirista kaydinta",
     "invalidBackupFile": "Faylka kaydinta waa khaldan",
-    "restoreFailed": "Soo celintu way guul dareysatay"
+    "restoreFailed": "Soo celintu way guul dareysatay",
+    "seedTitle": "Xog Muuqaal",
+    "seedDescription": "Buuxi bakhaarkaaga xog tijaabo ah oo dhab ah si aad u soo bandhigto ama u tijaabiso.",
+    "seedButton": "Buuxi Xog Tijaabo",
+    "seeding": "Waa la buuxinayaa...",
+    "seedSuccess": "Xogta tijaabada si guul leh ayaa loo buuxiyay! {categories} qaybood, {products} alaab, {customers} macmiil, {suppliers} alaab-qeybiye, {sales} iib, iyo {purchases} iibsasho ayaa la abuuray.",
+    "seedError": "Kuma guulaysan buuxinta xogta tijaabada. Bakhaarkaaga waxaa laga yaabaa inuu horay xog ugu haysto.",
+    "seedWarningTitle": "Buuxi Xog Tijaabo",
+    "seedWarningDescription": "Tani waxay buuxin doontaa bakhaarkaaga qaybaha, alaabta, macmiilasha, iibka, iyo iibsashada tijaabo ah. Waxay diyaar u tahay oo keliya bakhaarrada madhan."
   },
   "errors": {
     "notFoundTitle": "Bogga Lama Helin",

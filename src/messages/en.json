@@ -464,7 +464,15 @@
     "failedFetchBackupData": "Failed to fetch backup data",
     "failedDeleteBackup": "Failed to delete backup",
     "invalidBackupFile": "Invalid backup file",
-    "restoreFailed": "Restore failed"
+    "restoreFailed": "Restore failed",
+    "seedTitle": "Demo Data",
+    "seedDescription": "Populate your store with realistic demo data for testing or presentations.",
+    "seedButton": "Seed Demo Data",
+    "seeding": "Seeding...",
+    "seedSuccess": "Demo data seeded successfully! Created {categories} categories, {products} products, {customers} customers, {suppliers} suppliers, {sales} sales, and {purchases} purchases.",
+    "seedError": "Failed to seed demo data. Your store may already have data.",
+    "seedWarningTitle": "Seed Demo Data",
+    "seedWarningDescription": "This will fill your store with sample categories, products, customers, suppliers, sales, and purchases. Only available for empty stores."
   },
   "errors": {
     "notFoundTitle": "Page Not Found",

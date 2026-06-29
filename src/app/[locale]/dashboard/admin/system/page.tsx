@@ -14,6 +14,7 @@ import {
   X,
   FileJson,
   AlertTriangle,
+  Database,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -54,6 +55,7 @@ export default function BackupPage() {
   const [creating, setCreating] = React.useState(false)
   const [restoring, setRestoring] = React.useState(false)
   const [deleting, setDeleting] = React.useState<string | null>(null)
+  const [seeding, setSeeding] = React.useState(false)
 
   const [message, setMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null)
 
@@ -371,6 +373,52 @@ export default function BackupPage() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Database className="h-5 w-5" />
+            {t("seedTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {t("seedDescription")}
+          </p>
+          <Button
+            onClick={async () => {
+              setSeeding(true)
+              try {
+                const res = await fetch("/api/admin/seed", { method: "POST" })
+                const data = await res.json()
+                if (res.ok) {
+                  showMessage("success", t("seedSuccess", {
+                    categories: data.counts.categories,
+                    products: data.counts.products,
+                    customers: data.counts.customers,
+                    suppliers: data.counts.suppliers,
+                    sales: data.counts.sales,
+                    purchases: data.counts.purchases,
+                  }))
+                  router.refresh()
+                } else {
+                  showMessage("error", data.error || t("seedError"))
+                }
+              } catch {
+                showMessage("error", t("seedError"))
+              } finally {
+                setSeeding(false)
+              }
+            }}
+            disabled={seeding}
+            variant="outline"
+            className="gap-2"
+          >
+            <Database className="h-4 w-4" />
+            {seeding ? t("seeding") : t("seedButton")}
+          </Button>
         </CardContent>
       </Card>
 
