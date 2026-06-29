@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useTranslations } from "next-intl"
+import { useSession } from "next-auth/react"
 import {
   LayoutDashboard,
   Package,
@@ -15,6 +16,7 @@ import {
   Store,
   Truck,
   ClipboardList,
+  Database,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -34,7 +36,11 @@ export function DashboardSidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const t = useTranslations("nav")
   const locale = pathname.split("/")[1] || "en"
-  const items = sidebarItems
+  const { data: session } = useSession()
+  const isOwner = session?.user?.role === "OWNER"
+  const items = isOwner
+    ? [...sidebarItems, { href: "/dashboard/admin/system", label: "backup", icon: Database }]
+    : sidebarItems
 
   function NavLink({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) {
     const fullHref = `/${locale}${href}`

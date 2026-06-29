@@ -57,7 +57,11 @@ export default function VerifyEmailPage() {
     setResending(true)
     setResendSent(false)
     try {
-      const res = await fetch("/api/auth/verify-email/send", { method: "POST" })
+      const res = await fetch("/api/auth/verify-email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      })
       if (res.ok) {
         setResendSent(true)
       } else {

@@ -73,7 +73,10 @@
     "verifyEmailSuccess": "Email-ka si guul leh ayaa loo xaqiijiyay!",
     "verifyEmailResend": "Dib u dir email-ka xaqiijinta",
     "verifyEmailButton": "Dir email-ka xaqiijinta",
-    "verificationTokenInvalid": "Linkiga xaqiijinta waa khaldan ama wuu dhammaaday"
+    "verificationTokenInvalid": "Linkiga xaqiijinta waa khaldan ama wuu dhammaaday",
+    "emailNotVerified": "Fadlan xaqiiji email-kaaga kahor soo galidda.",
+    "registerVerifyPrompt": "Waxaan kuu soo dirnay linkiga xaqiijinta {email}. Fadlan hubi sanduuqaaga oo guji linkiga si aad u hawlgeliso akoonkaaga.",
+    "registerVerifyResend": "Ma helin email-ka? Hubi sanduuqa spam-ka ama"
   },
   "nav": {
     "home": "Guriga",
@@ -85,7 +88,7 @@
     "customers": "Macmiilasha",
     "sales": "Iibka",
     "reports": "Warbixinnada",
-    "admin": "Maamulka",
+    "backup": "Kaydinta",
     "settings": "Dejinta"
   },
   "dashboard": {
@@ -403,7 +406,12 @@
     "insufficientPayment": "Lacagta la helay waxay ka yar tahay wadarta guud",
     "thankYou": "Waad ku mahadsan tahay iibkaaga!",
     "unit": "Halbeeg",
-    "selectUnit": "Dooro halbeeg"
+    "selectUnit": "Dooro halbeeg",
+    "currencySymbol": "USD",
+    "expired": "WAQTII KAA BAXAY",
+    "lowStock": "KAYDKA HOOSEEYA",
+    "recentPurchases": "Iibsashadii Dhawaa",
+    "scanBarcodeTitle": "Qiiri Barcode-ka"
   },
   "admin": {
     "title": "Maamulka Nidaamka",
@@ -427,9 +435,35 @@
     "size": "Cabbirka",
     "date": "Taariikh",
     "status": "Heerka",
-    "environmentSummary": "Guudmarka Deegaanka",
-    "variable": "Doorsade",
-    "value": "Qiimaha"
+    "backupTitle": "Kaydinta",
+    "backupDescription": "Badbaadi ganacsigaaga adoo abuuraya oo soo celinaya kaydinta.",
+    "restoreBackupUpload": "Soo Celin Kaydinta (Soo Geli JSON)",
+    "restoringBackup": "Waa la soo celinayaa...",
+    "backupName": "Magaca Kaydinta",
+    "fileSize": "Cabbirka Faylka",
+    "createdDateTime": "Taariikhda & Waqtiga La Abuuray",
+    "download": "Soo Deji",
+    "restore": "Soo Celin",
+    "noBackupsYet": "Weli kaydin lama sameynin",
+    "noBackupsDescription": "Abuur kaydintaada koowaad si aad u badbaadiso xogta ganacsigaaga.",
+    "restoreWarningTitle": "Soo Celin Kaydinta",
+    "restoreWarningDescription": "Tani waxay bedeli doontaa dhammaan xogta bakhaarkaaga ee hadda jirta oo waxay ku celin doontaa xogta kaydinta.",
+    "restoreWarningIrreversible": "Ficilkan dib looma celin karo.",
+    "confirmRestore": "Xaqiiji Soo Celinta",
+    "deleteBackupTitle": "Tirtir Kaydinta",
+    "deleteWarningDescription": "Ma hubtaa inaad doonayso inaad tirtirto kaydintan?",
+    "created": "La abuuray: {date}",
+    "backupCreated": "Kaydinta si guul leh ayaa loo sameeyay",
+    "backupDeleted": "Kaydinta waa la tirtiray",
+    "backupRestored": "Kaydinta si guul leh ayaa loo soo celiyay",
+    "backupRestoredFromFile": "Kaydinta faylka si guul leh ayaa loo soo celiyay",
+    "failedLoadBackups": "Kuma guulaysan soo rarista kaydinta",
+    "failedCreateBackup": "Kuma guulaysan abuurista kaydinta",
+    "failedDownload": "Kuma guulaysan soo dejinta kaydinta",
+    "failedFetchBackupData": "Kuma guulaysan helista xogta kaydinta",
+    "failedDeleteBackup": "Kuma guulaysan tirtirista kaydinta",
+    "invalidBackupFile": "Faylka kaydinta waa khaldan",
+    "restoreFailed": "Soo celintu way guul dareysatay"
   },
   "errors": {
     "notFoundTitle": "Bogga Lama Helin",

@@ -3,8 +3,8 @@ import { getActiveEmailProvider } from "./registry"
 import { logger } from "@/lib/logger"
 import type { SendEmailParams } from "./types"
 
-const MAX_RETRIES = 3
-const BASE_DELAY = 2000
+const MAX_RETRIES = 1
+const BASE_DELAY = 500
 
 export function getBackoffDelay(retryCount: number): number {
   return BASE_DELAY * Math.pow(2, retryCount)

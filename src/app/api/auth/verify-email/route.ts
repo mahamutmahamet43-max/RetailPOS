@@ -3,7 +3,9 @@ import { prisma } from "@/lib/prisma"
 
 export async function POST(request: Request) {
   try {
-    const { token, email } = await request.json()
+    const body = await request.json()
+    const token = body.token as string
+    const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : ""
     if (!token || !email) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }

@@ -14,7 +14,8 @@ export async function POST(request: Request) {
       )
     }
 
-    const { token, email, password } = await request.json()
+    const { token, email: rawEmail, password } = await request.json()
+    const email = typeof rawEmail === "string" ? rawEmail.toLowerCase().trim() : ""
     if (!token || !email || !password) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }

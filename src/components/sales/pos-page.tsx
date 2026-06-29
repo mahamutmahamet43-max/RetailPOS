@@ -84,6 +84,21 @@ interface ProductResult {
   units: ProductUnit[]
 }
 
+const STORAGE_KEY = "retailpos-pos-cart"
+
+function loadCart(): CartItem[] {
+  if (typeof window === "undefined") return []
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveCart(cart: CartItem[]) {
+  if (typeof window === "undefined") return
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cart)) } catch {}
+}
+
 export function PosPage() {
   const t = useTranslations("sales")
   const common = useTranslations("common")
@@ -91,7 +106,7 @@ export function PosPage() {
   const [barcode, setBarcode] = React.useState("")
   const [searchQuery, setSearchQuery] = React.useState("")
   const [searchResults, setSearchResults] = React.useState<ProductResult[]>([])
-  const [cart, setCart] = React.useState<CartItem[]>([])
+  const [cart, setCart] = React.useState<CartItem[]>(loadCart)
   const [customers, setCustomers] = React.useState<Customer[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = React.useState("")
   const [paymentMethod, setPaymentMethod] = React.useState("CASH")
@@ -104,6 +119,7 @@ export function PosPage() {
   const [customerPurchases, setCustomerPurchases] = React.useState<any[]>([])
   const [showScanner, setShowScanner] = React.useState(false)
   const [showReceipt, setShowReceipt] = React.useState(false)
+  const [storeInfo, setStoreInfo] = React.useState({ name: "", address: "", phone: "" })
   const barcodeRef = React.useRef<HTMLInputElement>(null)
   const searchRef = React.useRef<HTMLInputElement>(null)
 
@@ -121,7 +137,17 @@ export function PosPage() {
 
   React.useEffect(() => {
     if (barcodeRef.current) barcodeRef.current.focus()
+    fetch("/api/settings/store")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.name) setStoreInfo({ name: data.name, address: data.settings?.address || "", phone: data.settings?.phone || "" })
+      })
+      .catch(() => {})
   }, [])
+
+  React.useEffect(() => {
+    saveCart(cart)
+  }, [cart])
 
   React.useEffect(() => {
     fetch("/api/customers?limit=1000")
@@ -367,12 +393,6 @@ export function PosPage() {
     }, 100)
   }
 
-  const storeInfo = {
-    name: "RetailPOS",
-    address: "",
-    phone: "",
-  }
-
   return (
     <>
       <div className="flex flex-col lg:flex-row gap-4 min-h-[calc(100vh-12rem)] lg:h-[calc(100vh-12rem)]">
@@ -415,17 +435,17 @@ export function PosPage() {
                       <div className="min-w-0 flex-1">
                         <span className="font-medium">{product.name}</span>
                         {product.expiryDate && new Date(product.expiryDate) < new Date(new Date().toDateString()) && (
-                          <span className="ml-2 text-xs text-destructive font-semibold">EXPIRED</span>
+                          <span className="ml-2 text-xs text-destructive font-semibold">{t("expired")}</span>
                         )}
                         {product.minimumStock > 0 && product.stockQuantity <= product.minimumStock && (
-                          <span className="ml-2 text-xs text-amber-600 font-semibold">LOW STOCK</span>
+                          <span className="ml-2 text-xs text-amber-600 font-semibold">{t("lowStock")}</span>
                         )}
                         {product.barcode && (
                           <span className="ml-2 text-xs text-muted-foreground font-mono">{product.barcode}</span>
                         )}
                       </div>
                       <div className="text-right text-xs text-muted-foreground shrink-0 ml-2">
-                        <div>${product.sellingPrice.toFixed(2)}</div>
+                        <div>{t("currencySymbol")}{product.sellingPrice.toFixed(2)}</div>
                         <div>
                           {t("stock")}: {product.stockQuantity}
                         </div>
@@ -522,7 +542,7 @@ export function PosPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono hidden sm:table-cell">
-                        ${item.unitPrice.toFixed(2)}
+                        {t("currencySymbol")}{item.unitPrice.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right hidden sm:table-cell">
                         <Input
@@ -543,7 +563,7 @@ export function PosPage() {
                         />
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
-                        $
+                        {t("currencySymbol")}
                         {(
                           item.unitPrice * item.quantity -
                           item.discount
@@ -591,22 +611,22 @@ export function PosPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("subtotal")}</span>
-                <span className="font-mono">${subtotal.toFixed(2)}</span>
+                <span className="font-mono">{t("currencySymbol")}{subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("discount")}</span>
                 <span className="font-mono text-destructive">
-                  -${totalDiscount.toFixed(2)}
+                  -{t("currencySymbol")}{totalDiscount.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("tax")}</span>
-                <span className="font-mono">${saleTax.toFixed(2)}</span>
+                <span className="font-mono">{t("currencySymbol")}{saleTax.toFixed(2)}</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg font-bold">
                 <span>{t("grandTotal")}</span>
-                <span className="font-mono">${grandTotal.toFixed(2)}</span>
+                <span className="font-mono">{t("currencySymbol")}{grandTotal.toFixed(2)}</span>
               </div>
             </CardContent>
           </Card>
@@ -631,11 +651,11 @@ export function PosPage() {
             </Select>
             {customerPurchases.length > 0 && (
               <div className="mt-1 text-xs text-muted-foreground max-h-24 overflow-y-auto space-y-1 border rounded p-2">
-                <p className="font-medium text-foreground">Recent Purchases</p>
+                <p className="font-medium text-foreground">{t("recentPurchases")}</p>
                 {customerPurchases.slice(0, 5).map((s: any) => (
                   <div key={s.id} className="flex justify-between">
                     <span>{s.saleNumber}</span>
-                    <span>${s.total.toFixed(2)}</span>
+                    <span>{t("currencySymbol")}{s.total.toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -696,7 +716,7 @@ export function PosPage() {
               />
               {parseFloat(amountPaid) > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  {t("change")}: ${changeGiven.toFixed(2)}
+                  {t("change")}: {t("currencySymbol")}{changeGiven.toFixed(2)}
                 </p>
               )}
             </div>
@@ -737,7 +757,7 @@ export function PosPage() {
       <Dialog open={showScanner} onOpenChange={setShowScanner}>
         <DialogContent className="sm:max-w-2xl w-full">
           <DialogHeader>
-            <DialogTitle>Scan Barcode</DialogTitle>
+            <DialogTitle>{t("scanBarcodeTitle")}</DialogTitle>
           </DialogHeader>
           <div id="barcode-scanner" className="w-full h-[70dvh] min-h-[350px] max-h-[600px] bg-muted rounded-lg overflow-hidden" />
         </DialogContent>

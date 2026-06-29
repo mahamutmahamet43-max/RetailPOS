@@ -15,8 +15,9 @@ export async function POST(request: Request) {
       )
     }
 
-    const { email } = await request.json()
-    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const { email: rawEmail } = await request.json()
+    const email = typeof rawEmail === "string" ? rawEmail.toLowerCase().trim() : ""
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 })
     }
 

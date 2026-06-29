@@ -38,7 +38,7 @@ export const authConfig: NextAuthConfig = {
         const { default: bcrypt } = await import("bcryptjs")
         const { prisma } = await import("@/lib/prisma")
 
-        const email = credentials.email as string
+        const email = (credentials.email as string).toLowerCase()
         const password = credentials.password as string
 
         const user = await prisma.user.findUnique({

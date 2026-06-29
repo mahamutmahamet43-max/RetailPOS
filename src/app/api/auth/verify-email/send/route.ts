@@ -11,7 +11,8 @@ export async function POST(request: Request) {
     let user: { id: string; email: string; name: string | null } | null = null
 
     const body = await request.json().catch(() => ({}))
-    const bodyEmail = body.email as string | undefined
+    const rawEmail = body.email as string | undefined
+    const bodyEmail = rawEmail ? rawEmail.toLowerCase().trim() : undefined
 
     const session = await auth()
     if (session?.user?.id) {

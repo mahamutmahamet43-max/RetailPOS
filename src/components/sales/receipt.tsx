@@ -116,13 +116,13 @@ export function Receipt({
               </td>
               <td className="text-right py-1">{item.quantity}</td>
               <td className="text-right py-1 font-mono">
-                ${item.unitPrice.toFixed(2)}
+                {t("currencySymbol")}{item.unitPrice.toFixed(2)}
               </td>
               <td className="text-right py-1 font-mono">
-                {item.discount > 0 ? `-$${item.discount.toFixed(2)}` : "—"}
+                {item.discount > 0 ? `-${t("currencySymbol")}${item.discount.toFixed(2)}` : "—"}
               </td>
               <td className="text-right py-1 font-mono">
-                ${item.total.toFixed(2)}
+                {t("currencySymbol")}{item.total.toFixed(2)}
               </td>
             </tr>
           ))}
@@ -132,25 +132,25 @@ export function Receipt({
       <div className="space-y-1 text-sm border-t pt-2">
         <div className="flex justify-between">
           <span className="text-muted-foreground">{t("subtotal")}</span>
-          <span className="font-mono">${sale.subtotal.toFixed(2)}</span>
+          <span className="font-mono">{t("currencySymbol")}{sale.subtotal.toFixed(2)}</span>
         </div>
         {sale.discount > 0 && (
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t("discount")}</span>
             <span className="font-mono text-destructive">
-              -${sale.discount.toFixed(2)}
+              -{t("currencySymbol")}{sale.discount.toFixed(2)}
             </span>
           </div>
         )}
         {sale.tax > 0 && (
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t("tax")}</span>
-            <span className="font-mono">${sale.tax.toFixed(2)}</span>
+            <span className="font-mono">{t("currencySymbol")}{sale.tax.toFixed(2)}</span>
           </div>
         )}
         <div className="flex justify-between font-bold text-lg border-t pt-1">
           <span>{t("grandTotal")}</span>
-          <span className="font-mono">${sale.total.toFixed(2)}</span>
+          <span className="font-mono">{t("currencySymbol")}{sale.total.toFixed(2)}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">{t("paymentMethod")}</span>
@@ -158,12 +158,12 @@ export function Receipt({
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">{t("amountPaid")}</span>
-          <span className="font-mono">${sale.amountPaid.toFixed(2)}</span>
+          <span className="font-mono">{t("currencySymbol")}{sale.amountPaid.toFixed(2)}</span>
         </div>
         {sale.changeGiven > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">{t("change")}</span>
-            <span className="font-mono">${sale.changeGiven.toFixed(2)}</span>
+            <span className="font-mono">{t("currencySymbol")}{sale.changeGiven.toFixed(2)}</span>
           </div>
         )}
       </div>
