@@ -88,7 +88,7 @@ export const saleItemSchema = z.object({
 export const saleSchema = z.object({
   items: z.array(saleItemSchema).min(1, "At least one item is required"),
   customerId: z.string().optional().nullable(),
-  paymentMethod: z.enum(["CASH"]),
+  paymentMethod: z.enum(["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD"]),
   amountPaid: z.number().min(0).default(0),
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),

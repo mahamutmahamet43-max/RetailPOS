@@ -251,10 +251,10 @@ export async function POST(request: Request) {
       const items = sale.items.map((i) => ({
         name: i.productName,
         quantity: i.quantity,
-        price: `$${i.unitPrice.toFixed(2)}`,
-        total: `$${i.total.toFixed(2)}`,
+        price: `${i.unitPrice.toFixed(2)}`,
+        total: `${i.total.toFixed(2)}`,
       }))
-      sendInvoiceEmail(sale.customer.email, sale.customer.firstName, sale.saleNumber, `$${sale.total.toFixed(2)}`, items, store.name || "Store").catch(() => {})
+      sendInvoiceEmail(sale.customer.email, sale.customer.firstName, sale.saleNumber, `${sale.total.toFixed(2)}`, items, store.name || "Store").catch(() => {})
     }
 
     return NextResponse.json(sale, { status: 201 })
