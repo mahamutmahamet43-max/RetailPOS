@@ -777,14 +777,14 @@ export async function POST(request: Request) {
         const discount = salesCreated % 20 === 0 ? randomFloat(0.5, 3.0) : 0
         const tax = parseFloat((subtotal * 0.05).toFixed(2))
         const total = subtotal - discount + tax
-        const paymentMethod = weightedRandom(["SAHAL", "ZAAD", "EVC_PLUS", "CASH", "CARD"], [7, 1, 1, 1, 1])
-        const paid = paymentMethod === "CASH" ? total + randomFloat(0, 5) : total
-        const changeGiven = paymentMethod === "CASH" ? Math.max(0, paid - total) : 0
+        const pm = weightedRandom(["SAHAL", "ZAAD", "EVC_PLUS", "CASH", "CARD"], [7, 1, 1, 1, 1])
+        const paid = pm === "CASH" ? total + randomFloat(0, 5) : total
+        const changeGiven = pm === "CASH" ? Math.max(0, paid - total) : 0
 
         await prisma.sale.create({
           data: {
             saleNumber, subtotal, discount, tax, total, amountPaid: paid, changeGiven,
-            paymentMethod, status: "COMPLETED", storeId, customerId, cashierId: user.id,
+            paymentMethod: pm as any, status: "COMPLETED", storeId, customerId, cashierId: user.id,
             createdAt: saleDate,
             items: { create: saleItems },
           },
