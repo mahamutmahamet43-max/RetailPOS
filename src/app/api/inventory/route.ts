@@ -19,8 +19,8 @@ export async function GET(request: Request) {
     const type = searchParams.get("type") || ""
     const from = searchParams.get("from") || ""
     const to = searchParams.get("to") || ""
-    const page = parseInt(searchParams.get("page") || "1")
-    const limit = parseInt(searchParams.get("limit") || "10")
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1)
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "10") || 10))
     const skip = (page - 1) * limit
 
     const where: Prisma.InventoryTransactionWhereInput = {
@@ -94,6 +94,7 @@ export async function POST(request: Request) {
 
     const product = await prisma.product.findFirst({
       where: { id: productId, storeId: store.id },
+      select: { id: true, name: true, stockQuantity: true, minimumStock: true },
     })
 
     if (!product) {
@@ -103,31 +104,33 @@ export async function POST(request: Request) {
       )
     }
 
-    const previousStock = product.stockQuantity
-
-    if (transactionType === "OUT" && quantity > previousStock) {
+    if (transactionType === "OUT" && quantity > product.stockQuantity) {
       return NextResponse.json(
-        { error: `Stock out cannot reduce stock below zero. Current stock: ${previousStock}` },
+        { error: `Stock out cannot reduce stock below zero. Current stock: ${product.stockQuantity}` },
         { status: 400 }
       )
     }
 
-    const newQuantity =
-      transactionType === "ADJUSTMENT"
-        ? quantity
-        : transactionType === "IN"
-          ? previousStock + quantity
-          : previousStock - quantity
+    let newQuantity = 0
+    const transaction = await prisma.$transaction(async (tx) => {
+      const current = await tx.product.findUnique({
+        where: { id: productId },
+        select: { stockQuantity: true },
+      })
+      const previousStock = current?.stockQuantity ?? 0
 
-    if (newQuantity < 0) {
-      return NextResponse.json(
-        { error: "New stock value must be zero or greater" },
-        { status: 400 }
-      )
-    }
+      newQuantity =
+        transactionType === "ADJUSTMENT"
+          ? quantity
+          : transactionType === "IN"
+            ? previousStock + quantity
+            : previousStock - quantity
 
-    const [transaction] = await prisma.$transaction([
-      prisma.inventoryTransaction.create({
+      if (newQuantity < 0) {
+        throw new Error("Stock adjustment would result in negative inventory")
+      }
+
+      const created = await tx.inventoryTransaction.create({
         data: {
           transactionType,
           quantity: transactionType === "ADJUSTMENT" ? newQuantity : quantity,
@@ -143,12 +146,15 @@ export async function POST(request: Request) {
           product: { select: { id: true, name: true, sku: true } },
           creator: { select: { id: true, name: true } },
         },
-      }),
-      prisma.product.update({
+      })
+
+      await tx.product.update({
         where: { id: productId },
         data: { stockQuantity: newQuantity },
-      }),
-    ])
+      })
+
+      return created
+    })
 
     logger.inventoryUpdated(productId, transactionType, quantity)
 
@@ -156,13 +162,13 @@ export async function POST(request: Request) {
       const user = await prisma.user.findUnique({ where: { id: auth.userId }, select: { email: true, name: true } })
       if (user?.email) {
         const lowStockResult = await sendLowStockEmail(user.email, user.name || "Store Owner", store.name || "Store", product.name, newQuantity, product.minimumStock)
-      if (!lowStockResult.success) {
-        logger.warn("Low stock email not sent", {
-          product: product.name,
-          email: user.email,
-          error: lowStockResult.error,
-        })
-      }
+        if (!lowStockResult.success) {
+          logger.warn("Low stock email not sent", {
+            product: product.name,
+            email: user.email,
+            error: lowStockResult.error,
+          })
+        }
       }
     }
 

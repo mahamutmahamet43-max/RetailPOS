@@ -66,23 +66,23 @@ export async function POST(request: Request) {
 
       const items = data.categories as Array<Record<string, unknown>>
       for (const record of items) {
-        const { id, createdAt, updatedAt, ...rest } = record
-        await tx.category.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, ...rest } as any })
+        const { id, createdAt, updatedAt, storeId: _, ...rest } = record
+        await tx.category.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, storeId, ...rest } as any })
       }
 
       const supplierItems = data.suppliers as Array<Record<string, unknown>>
       for (const record of supplierItems) {
-        const { id, createdAt, updatedAt, ...rest } = record
-        await tx.supplier.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, ...rest } as any })
+        const { id, createdAt, updatedAt, storeId: _, ...rest } = record
+        await tx.supplier.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, storeId, ...rest } as any })
       }
 
       const productItems = data.products as Array<Record<string, unknown>>
       for (const record of productItems) {
-        const { id, createdAt, updatedAt, units, ...rest } = record
-        await tx.product.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, ...rest } as any })
+        const { id, createdAt, updatedAt, storeId: _, units, ...rest } = record
+        await tx.product.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, storeId, ...rest } as any })
         if (Array.isArray(units)) {
           for (const unit of units) {
-            const { productId, ...unitRest } = unit as Record<string, unknown>
+            const { storeId: _u, ...unitRest } = unit as Record<string, unknown>
             await tx.productUnit.create({ data: { productId: id as string, ...unitRest } as any })
           }
         }
@@ -90,37 +90,37 @@ export async function POST(request: Request) {
 
       const customerItems = data.customers as Array<Record<string, unknown>>
       for (const record of customerItems) {
-        const { id, createdAt, updatedAt, ...rest } = record
-        await tx.customer.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, ...rest } as any })
+        const { id, createdAt, updatedAt, storeId: _, ...rest } = record
+        await tx.customer.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, storeId, ...rest } as any })
       }
 
       const purchaseItems = data.purchases as Array<Record<string, unknown>>
       for (const record of purchaseItems) {
-        const { id, createdAt, updatedAt, ...rest } = record
-        await tx.purchase.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, ...rest } as any })
+        const { id, createdAt, updatedAt, storeId: _, ...rest } = record
+        await tx.purchase.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, storeId, ...rest } as any })
       }
 
       const purchaseItemItems = data.purchaseItems as Array<Record<string, unknown>> | undefined
       if (purchaseItemItems) {
         for (const record of purchaseItemItems) {
-          const { id, createdAt, updatedAt, ...rest } = record
+          const { id, createdAt, updatedAt, storeId: _, ...rest } = record
           await tx.purchaseItem.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, ...rest } as any })
         }
       }
 
       const inventoryItems = data.inventory as Array<Record<string, unknown>>
       for (const record of inventoryItems) {
-        const { id, createdAt, updatedAt, ...rest } = record
-        await tx.inventoryTransaction.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, ...rest } as any })
+        const { id, createdAt, updatedAt, storeId: _, ...rest } = record
+        await tx.inventoryTransaction.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, storeId, ...rest } as any })
       }
 
       const saleItems = data.sales as Array<Record<string, unknown>>
       for (const record of saleItems) {
-        const { id, createdAt, updatedAt, items: saleItemData, ...rest } = record
-        await tx.sale.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, ...rest } as any })
+        const { id, createdAt, updatedAt, storeId: _, items: saleItemData, ...rest } = record
+        await tx.sale.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, storeId, ...rest } as any })
         if (Array.isArray(saleItemData)) {
           for (const si of saleItemData) {
-            const { saleId, ...siRest } = si as Record<string, unknown>
+            const { saleId, storeId: _s, ...siRest } = si as Record<string, unknown>
             await tx.saleItem.create({ data: { saleId: id as string, ...siRest } as any })
           }
         }
@@ -128,8 +128,8 @@ export async function POST(request: Request) {
 
       const settingsItems = data.storeSettings as Array<Record<string, unknown>>
       for (const record of settingsItems) {
-        const { id, createdAt, updatedAt, ...rest } = record
-        await tx.storeSetting.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, ...rest } as any })
+        const { id, createdAt, updatedAt, storeId: _, ...rest } = record
+        await tx.storeSetting.create({ data: { id: id as string, createdAt: createdAt as Date, updatedAt: updatedAt as Date, storeId, ...rest } as any })
       }
     })
 

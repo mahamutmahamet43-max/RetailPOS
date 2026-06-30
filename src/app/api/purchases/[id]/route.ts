@@ -109,6 +109,19 @@ export async function PATCH(
       }
     }
 
+    if (supplierId) {
+      const supplier = await prisma.supplier.findFirst({
+        where: { id: supplierId, storeId: store.id },
+        select: { id: true },
+      })
+      if (!supplier) {
+        return NextResponse.json(
+          { error: "Supplier not found in your store" },
+          { status: 404 }
+        )
+      }
+    }
+
     const wasCompleted = existing.status === "COMPLETED"
     const isCompleted = status === "COMPLETED"
 

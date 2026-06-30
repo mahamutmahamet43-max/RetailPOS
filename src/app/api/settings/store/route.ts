@@ -106,7 +106,8 @@ export async function PUT(request: Request) {
 
     const settingsData: Record<string, unknown> = {}
     for (const field of stringFields) {
-      if (validBody[field as keyof typeof validBody] !== undefined) settingsData[field] = String(validBody[field as keyof typeof validBody])
+      const val = validBody[field as keyof typeof validBody]
+      if (val !== undefined) settingsData[field] = val === null ? null : String(val)
     }
     for (const field of boolFields) {
       if (validBody[field as keyof typeof validBody] !== undefined) settingsData[field] = Boolean(validBody[field as keyof typeof validBody])

@@ -133,9 +133,11 @@ export async function PATCH(
 
     if (data.units) {
       const incomingIds = data.units.filter((u) => u.id).map((u) => u.id!)
-      await prisma.productUnit.deleteMany({
-        where: { productId: id, id: { notIn: incomingIds } },
-      })
+      if (incomingIds.length > 0) {
+        await prisma.productUnit.deleteMany({
+          where: { productId: id, id: { notIn: incomingIds } },
+        })
+      }
       for (const u of data.units) {
         if (u.id) {
           await prisma.productUnit.update({

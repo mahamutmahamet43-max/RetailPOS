@@ -24,6 +24,7 @@ async function main() {
       email: ownerEmail,
       passwordHash,
       role: "OWNER",
+      emailVerified: new Date(),
     },
   })
 
@@ -97,6 +98,7 @@ async function main() {
       email: "manager@retailpos.com",
       passwordHash: managerPasswordHash,
       role: "MANAGER",
+      emailVerified: new Date(),
     },
   })
 
@@ -107,6 +109,7 @@ async function main() {
       email: "cashier@retailpos.com",
       passwordHash: cashierPasswordHash,
       role: "CASHIER",
+      emailVerified: new Date(),
     },
   })
 

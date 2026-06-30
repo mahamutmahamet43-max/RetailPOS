@@ -16,8 +16,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search") || ""
     const status = searchParams.get("status") || ""
-    const page = parseInt(searchParams.get("page") || "1")
-    const limit = parseInt(searchParams.get("limit") || "10")
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1)
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "10") || 10))
     const skip = (page - 1) * limit
 
     const where: Prisma.PurchaseWhereInput = { storeId: store.id }
@@ -99,6 +99,19 @@ export async function POST(request: Request) {
       if (!productMap.has(item.productId)) {
         return NextResponse.json(
           { error: `Product not found: ${item.productName}` },
+          { status: 404 }
+        )
+      }
+    }
+
+    if (supplierId) {
+      const supplier = await prisma.supplier.findFirst({
+        where: { id: supplierId, storeId: store.id },
+        select: { id: true },
+      })
+      if (!supplier) {
+        return NextResponse.json(
+          { error: "Supplier not found in your store" },
           { status: 404 }
         )
       }

@@ -85,16 +85,15 @@ export default async function middleware(req: NextRequest) {
       return Response.redirect(loginUrl)
     }
 
-    if (isAuthPage && isLoggedIn) {
+    const emailVerified = session?.emailVerified as boolean | undefined
+
+    if (isAuthPage && isLoggedIn && emailVerified !== false) {
       return Response.redirect(new URL(`/${locale}/dashboard`, req.url))
     }
 
-    if (isDashboardPage && isLoggedIn && session) {
-      const emailVerified = session.emailVerified as boolean | undefined
-      if (emailVerified === false) {
-        const verifyUrl = new URL(`/${locale}/verify-email`, req.url)
-        return Response.redirect(verifyUrl)
-      }
+    if (isDashboardPage && isLoggedIn && emailVerified === false) {
+      const verifyUrl = new URL(`/${locale}/verify-email`, req.url)
+      return Response.redirect(verifyUrl)
     }
   }
 

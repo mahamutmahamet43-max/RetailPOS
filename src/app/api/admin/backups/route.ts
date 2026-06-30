@@ -7,37 +7,42 @@ import { logger } from "@/lib/logger"
 export const dynamic = "force-dynamic"
 
 export async function GET() {
-  const auth = await requireRole("OWNER")
-  if (auth instanceof NextResponse) return auth
+  try {
+    const auth = await requireRole("OWNER")
+    if (auth instanceof NextResponse) return auth
 
-  const store = await getCurrentStore()
-  if (!store) return noStoreResponse()
+    const store = await getCurrentStore()
+    if (!store) return noStoreResponse()
 
-  const backups = await prisma.backup.findMany({
-    where: { storeId: store.id },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, filename: true, size: true, createdAt: true, status: true },
-  })
+    const backups = await prisma.backup.findMany({
+      where: { storeId: store.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, filename: true, size: true, createdAt: true, status: true },
+    })
 
-  return NextResponse.json({
-    backups,
-    totalBackups: backups.length,
-  })
+    return NextResponse.json({
+      backups,
+      totalBackups: backups.length,
+    })
+  } catch (error) {
+    logger.error("GET /api/admin/backups error", error instanceof Error ? error : undefined)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
 export async function POST() {
-  const auth = await requireRole("OWNER")
-  if (auth instanceof NextResponse) return auth
-
-  const store = await getCurrentStore()
-  if (!store) return noStoreResponse()
-
   try {
+    const auth = await requireRole("OWNER")
+    if (auth instanceof NextResponse) return auth
+
+    const store = await getCurrentStore()
+    if (!store) return noStoreResponse()
+
     const storeId = store.id
 
     const backupData: Record<string, unknown> = {
       store: await prisma.store.findUnique({ where: { id: storeId } }),
-      user: await prisma.user.findUnique({ where: { id: auth.userId } }),
+      user: await prisma.user.findUnique({ where: { id: auth.userId }, select: { id: true, name: true, email: true, role: true, createdAt: true } }),
       categories: await prisma.category.findMany({ where: { storeId } }),
       products: await prisma.product.findMany({ where: { storeId }, include: { units: true } }),
       customers: await prisma.customer.findMany({ where: { storeId } }),

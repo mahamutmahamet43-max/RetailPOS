@@ -20,8 +20,8 @@ export async function GET(request: Request) {
     const to = searchParams.get("to") || ""
     const payment = searchParams.get("payment") || ""
     const cashier = searchParams.get("cashier") || ""
-    const page = parseInt(searchParams.get("page") || "1")
-    const limit = parseInt(searchParams.get("limit") || "10")
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1)
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "10") || 10))
     const skip = (page - 1) * limit
 
     const where: Prisma.SaleWhereInput = {
@@ -157,13 +157,13 @@ export async function POST(request: Request) {
 
     const lastSale = await prisma.sale.findFirst({
       where: { storeId: store.id },
-      orderBy: { createdAt: "desc" },
+      orderBy: { saleNumber: "desc" },
       select: { saleNumber: true },
     })
 
     let nextNumber = 1
     if (lastSale?.saleNumber) {
-      const num = parseInt(lastSale.saleNumber.replace("SALE-", ""))
+      const num = parseInt(lastSale.saleNumber.replace("SALE-", ""), 10)
       if (!isNaN(num)) nextNumber = num + 1
     }
     const saleNumber = `SALE-${String(nextNumber).padStart(6, "0")}`
