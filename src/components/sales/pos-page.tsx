@@ -84,22 +84,21 @@ interface ProductResult {
   units: ProductUnit[]
 }
 
-const STORAGE_KEY = "retailpos-pos-cart"
+function cartKey(storeId: string) { return `retailpos-pos-cart-${storeId}` }
+function metaKey(storeId: string) { return `retailpos-pos-meta-${storeId}` }
 
-function loadCart(): CartItem[] {
+function loadCart(storeId: string): CartItem[] {
   if (typeof window === "undefined") return []
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(cartKey(storeId))
     return raw ? JSON.parse(raw) : []
   } catch { return [] }
 }
 
-function saveCart(cart: CartItem[]) {
+function saveCart(storeId: string, cart: CartItem[]) {
   if (typeof window === "undefined") return
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cart)) } catch {}
+  try { localStorage.setItem(cartKey(storeId), JSON.stringify(cart)) } catch {}
 }
-
-const META_KEY = "retailpos-pos-meta"
 
 interface PosMeta {
   selectedCustomerId: string
@@ -109,35 +108,71 @@ interface PosMeta {
   amountPaid: string
 }
 
-function loadMeta(): PosMeta {
+function loadMeta(storeId: string): PosMeta {
   if (typeof window === "undefined") return { selectedCustomerId: "", paymentMethod: "SAHAL", discount: "0", tax: "0", amountPaid: "" }
   try {
-    const raw = localStorage.getItem(META_KEY)
+    const raw = localStorage.getItem(metaKey(storeId))
     if (raw) return JSON.parse(raw)
   } catch {}
   return { selectedCustomerId: "", paymentMethod: "SAHAL", discount: "0", tax: "0", amountPaid: "" }
 }
 
-function saveMeta(meta: PosMeta) {
+function saveMeta(storeId: string, meta: PosMeta) {
   if (typeof window === "undefined") return
-  try { localStorage.setItem(META_KEY, JSON.stringify(meta)) } catch {}
+  try { localStorage.setItem(metaKey(storeId), JSON.stringify(meta)) } catch {}
 }
 
-export function PosPage() {
+/** Migrate old generic keys (shared between stores) to store-scoped keys, then remove them. */
+function migrateOldKeys(storeId: string) {
+  if (typeof window === "undefined") return
+  try {
+    const oldCart = localStorage.getItem("retailpos-pos-cart")
+    if (oldCart) {
+      if (!localStorage.getItem(cartKey(storeId))) {
+        localStorage.setItem(cartKey(storeId), oldCart)
+      }
+      localStorage.removeItem("retailpos-pos-cart")
+    }
+    const oldMeta = localStorage.getItem("retailpos-pos-meta")
+    if (oldMeta) {
+      if (!localStorage.getItem(metaKey(storeId))) {
+        localStorage.setItem(metaKey(storeId), oldMeta)
+      }
+      localStorage.removeItem("retailpos-pos-meta")
+    }
+  } catch {}
+}
+
+function clearAllPosState() {
+  if (typeof window === "undefined") return
+  try {
+    const toRemove: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith("retailpos-pos-")) toRemove.push(key)
+    }
+    toRemove.forEach(k => localStorage.removeItem(k))
+  } catch {}
+}
+
+export function PosPage({ storeId }: { storeId: string }) {
   const t = useTranslations("sales")
   const common = useTranslations("common")
+
+  // Migrate old generic keys once on mount
+  React.useEffect(() => { migrateOldKeys(storeId) }, [storeId])
 
   const [barcode, setBarcode] = React.useState("")
   const [searchQuery, setSearchQuery] = React.useState("")
   const [searchResults, setSearchResults] = React.useState<ProductResult[]>([])
-  const [cart, setCart] = React.useState<CartItem[]>(loadCart)
-  const meta = React.useRef(loadMeta())
+  const [cart, setCart] = React.useState<CartItem[]>(() => loadCart(storeId))
+  const metaRef = React.useRef(loadMeta(storeId))
   const [customers, setCustomers] = React.useState<Customer[]>([])
-  const [selectedCustomerId, setSelectedCustomerId] = React.useState(meta.current.selectedCustomerId)
-  const [paymentMethod, setPaymentMethod] = React.useState(meta.current.paymentMethod)
-  const [amountPaid, setAmountPaid] = React.useState(meta.current.amountPaid)
-  const [discount, setDiscount] = React.useState(meta.current.discount)
-  const [tax, setTax] = React.useState(meta.current.tax)
+  const [selectedCustomerId, setSelectedCustomerId] = React.useState(metaRef.current.selectedCustomerId)
+  const [paymentMethod, setPaymentMethod] = React.useState(metaRef.current.paymentMethod)
+  const [amountPaid, setAmountPaid] = React.useState(metaRef.current.amountPaid)
+  const [discount, setDiscount] = React.useState(metaRef.current.discount)
+  const [tax, setTax] = React.useState(metaRef.current.tax)
   const [checkingOut, setCheckingOut] = React.useState(false)
   const [error, setError] = React.useState("")
   const [lastSale, setLastSale] = React.useState<any>(null)
@@ -171,12 +206,12 @@ export function PosPage() {
   }, [])
 
   React.useEffect(() => {
-    saveCart(cart)
-  }, [cart])
+    saveCart(storeId, cart)
+  }, [storeId, cart])
 
   React.useEffect(() => {
-    saveMeta({ selectedCustomerId, paymentMethod, discount, tax, amountPaid })
-  }, [selectedCustomerId, paymentMethod, discount, tax, amountPaid])
+    saveMeta(storeId, { selectedCustomerId, paymentMethod, discount, tax, amountPaid })
+  }, [storeId, selectedCustomerId, paymentMethod, discount, tax, amountPaid])
 
   React.useEffect(() => {
     fetch("/api/customers?limit=1000")

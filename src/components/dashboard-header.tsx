@@ -4,6 +4,18 @@ import * as React from "react"
 import { useSession, signOut } from "next-auth/react"
 import { useTranslations } from "next-intl"
 import { LogOut, User, Menu } from "lucide-react"
+
+function clearPosState() {
+  if (typeof window === "undefined") return
+  try {
+    const toRemove: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith("retailpos-pos-")) toRemove.push(key)
+    }
+    toRemove.forEach(k => localStorage.removeItem(k))
+  } catch {}
+}
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -73,7 +85,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={() => { clearPosState(); signOut({ callbackUrl: "/" }) }}
               className="cursor-pointer"
             >
               <LogOut className="mr-2 h-4 w-4" />
