@@ -155,24 +155,21 @@ function clearAllPosState() {
   } catch {}
 }
 
-export function PosPage({ storeId }: { storeId: string }) {
+export function PosPage() {
   const t = useTranslations("sales")
   const common = useTranslations("common")
 
-  // Migrate old generic keys once on mount
-  React.useEffect(() => { migrateOldKeys(storeId) }, [storeId])
-
+  const [storeId, setStoreId] = React.useState<string | null>(null)
   const [barcode, setBarcode] = React.useState("")
   const [searchQuery, setSearchQuery] = React.useState("")
   const [searchResults, setSearchResults] = React.useState<ProductResult[]>([])
-  const [cart, setCart] = React.useState<CartItem[]>(() => loadCart(storeId))
-  const metaRef = React.useRef(loadMeta(storeId))
+  const [cart, setCart] = React.useState<CartItem[]>([])
   const [customers, setCustomers] = React.useState<Customer[]>([])
-  const [selectedCustomerId, setSelectedCustomerId] = React.useState(metaRef.current.selectedCustomerId)
-  const [paymentMethod, setPaymentMethod] = React.useState(metaRef.current.paymentMethod)
-  const [amountPaid, setAmountPaid] = React.useState(metaRef.current.amountPaid)
-  const [discount, setDiscount] = React.useState(metaRef.current.discount)
-  const [tax, setTax] = React.useState(metaRef.current.tax)
+  const [selectedCustomerId, setSelectedCustomerId] = React.useState("")
+  const [paymentMethod, setPaymentMethod] = React.useState("SAHAL")
+  const [amountPaid, setAmountPaid] = React.useState("")
+  const [discount, setDiscount] = React.useState("0")
+  const [tax, setTax] = React.useState("0")
   const [checkingOut, setCheckingOut] = React.useState(false)
   const [error, setError] = React.useState("")
   const [lastSale, setLastSale] = React.useState<any>(null)
@@ -201,16 +198,28 @@ export function PosPage({ storeId }: { storeId: string }) {
       .then((r) => r.json())
       .then((data) => {
         if (data.name) setStoreInfo({ name: data.name, address: data.settings?.address || "", phone: data.settings?.phone || "" })
+        if (data.id) {
+          migrateOldKeys(data.id)
+          setStoreId(data.id)
+          const savedCart = loadCart(data.id)
+          if (savedCart.length > 0) setCart(savedCart)
+          const savedMeta = loadMeta(data.id)
+          setSelectedCustomerId(savedMeta.selectedCustomerId)
+          setPaymentMethod(savedMeta.paymentMethod)
+          setDiscount(savedMeta.discount)
+          setTax(savedMeta.tax)
+          setAmountPaid(savedMeta.amountPaid)
+        }
       })
       .catch(() => {})
   }, [])
 
   React.useEffect(() => {
-    saveCart(storeId, cart)
+    if (storeId) saveCart(storeId, cart)
   }, [storeId, cart])
 
   React.useEffect(() => {
-    saveMeta(storeId, { selectedCustomerId, paymentMethod, discount, tax, amountPaid })
+    if (storeId) saveMeta(storeId, { selectedCustomerId, paymentMethod, discount, tax, amountPaid })
   }, [storeId, selectedCustomerId, paymentMethod, discount, tax, amountPaid])
 
   React.useEffect(() => {

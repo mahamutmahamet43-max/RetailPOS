@@ -29,6 +29,7 @@ export async function GET() {
     const store = await prisma.store.findFirst({
       where: { ownerId: authResult.userId },
       select: {
+        id: true,
         name: true,
         description: true,
         settings: {
@@ -54,6 +55,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      id: store.id,
       name: store.name,
       description: store.description,
       settings: store.settings || {},
@@ -121,6 +123,7 @@ export async function PUT(request: Request) {
     const updated = await prisma.store.findUnique({
       where: { id: store.id },
       select: {
+        id: true,
         name: true,
         description: true,
         settings: {
@@ -142,6 +145,7 @@ export async function PUT(request: Request) {
     })
 
     return NextResponse.json({
+      id: updated?.id,
       name: updated?.name,
       description: updated?.description,
       settings: updated?.settings || {},
