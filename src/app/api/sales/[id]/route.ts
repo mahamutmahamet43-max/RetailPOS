@@ -115,6 +115,20 @@ export async function PATCH(
         }
       }
 
+      if (sale.paymentMethod === "CREDIT" && sale.customerId && sale.remainingBalance && sale.remainingBalance > 0) {
+        const cust = await tx.customer.findUnique({
+          where: { id: sale.customerId },
+          select: { currentBalance: true },
+        })
+        if (cust) {
+          const newBalance = Math.max(0, cust.currentBalance - (sale.remainingBalance || 0))
+          await tx.customer.update({
+            where: { id: sale.customerId },
+            data: { currentBalance: newBalance },
+          })
+        }
+      }
+
       return updated
     })
 

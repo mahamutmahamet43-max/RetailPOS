@@ -99,7 +99,11 @@
     "totalRevenue": "Total Revenue",
     "activeProducts": "Active Products",
     "totalCustomers": "Total Customers",
-    "totalOrders": "Total Orders"
+    "totalOrders": "Total Orders",
+    "outstandingCredit": "Outstanding Credit",
+    "customersWithDebt": "Customers With Debt",
+    "todayCreditSales": "Today's Credit Sales",
+    "recentPayments": "Recent Payments"
   },
   "categories": {
     "title": "Categories",
@@ -215,7 +219,21 @@
     "noSales": "No sales yet",
     "customerInfo": "Customer Information",
     "saleNumber": "Sale #",
-    "cashier": "Cashier"
+    "cashier": "Cashier",
+    "outstandingBalance": "Outstanding Balance",
+    "creditSalesHistory": "Credit Sales History",
+    "paymentsReceived": "Payments Received",
+    "receivePayment": "Receive Payment",
+    "paymentAmount": "Amount",
+    "paymentMethod": "Payment Method",
+    "paymentReference": "Reference",
+    "paymentNotes": "Notes",
+    "paymentCreated": "Payment recorded successfully",
+    "noPayments": "No payments received yet",
+    "totalPaid": "Total Paid",
+    "totalCreditSales": "Total Credit Sales",
+    "lastPaymentDate": "Last Payment",
+    "creditLimitExceeded": "Credit limit exceeded"
   },
   "inventory": {
     "title": "Inventory",
@@ -344,7 +362,21 @@
     "items": "Items",
     "lastPurchase": "Last Purchase",
     "supplierName": "Supplier Name",
-    "purchaseCount": "Purchases"
+    "purchaseCount": "Purchases",
+    "credit": "Credit",
+    "creditReport": "Customer Credit",
+    "outstandingBalances": "Outstanding Balances",
+    "overdueCustomers": "Overdue Customers",
+    "paymentsReceived": "Payments Received",
+    "totalOutstanding": "Total Outstanding",
+    "customersWithDebt": "Customers With Debt",
+    "todayCreditSales": "Today's Credit Sales",
+    "topDebtors": "Top Debtors",
+    "balance": "Balance",
+    "creditLimit": "Credit Limit",
+    "totalSales": "Total Sales",
+    "lastPayment": "Last Payment",
+    "noCreditData": "No credit data available"
   },
   "sales": {
     "title": "Sales",
@@ -412,7 +444,13 @@
     "voidSuccess": "Sale voided successfully",
     "refundQuantity": "Refund Qty",
     "available": "Available",
-    "noItemsToRefund": "No items available for refund"
+    "noItemsToRefund": "No items available for refund",
+    "credit": "Credit (Pay Later)",
+    "creditWarning": "This sale will be added to the customer's outstanding balance.",
+    "unpaid": "Unpaid",
+    "partiallyPaid": "Partially Paid",
+    "paid": "Paid",
+    "remainingBalance": "Remaining Balance"
   },
   "admin": {
     "title": "System Administration",

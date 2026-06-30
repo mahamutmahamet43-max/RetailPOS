@@ -82,6 +82,8 @@ interface Sale {
   changeGiven: number
   paymentMethod: string
   status: string
+  creditStatus: string | null
+  remainingBalance: number | null
   createdAt: string
   customer: SaleCustomer | null
   cashier: SaleCashier
@@ -196,8 +198,28 @@ export function SalesHistory() {
       EVC_PLUS: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100",
       SAHAL: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100",
       CARD: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100",
+      CREDIT: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-100",
     }
     return colors[method] || ""
+  }
+
+  const creditStatusBadge = (status: string | null) => {
+    if (!status) return null
+    const colors: Record<string, string> = {
+      UNPAID: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
+      PARTIALLY_PAID: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100",
+      PAID: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+    }
+    const labels: Record<string, string> = {
+      UNPAID: t("unpaid"),
+      PARTIALLY_PAID: t("partiallyPaid"),
+      PAID: t("paid"),
+    }
+    return (
+      <Badge className={`${colors[status] || ""} border-0`}>
+        {labels[status] || status}
+      </Badge>
+    )
   }
 
   const paymentLabel = (method: string) => {
@@ -207,6 +229,7 @@ export function SalesHistory() {
       EVC_PLUS: "EVC Plus",
       SAHAL: "Sahal",
       CARD: t("card"),
+      CREDIT: t("credit"),
     }
     return map[method] || method
   }
@@ -233,9 +256,10 @@ export function SalesHistory() {
             <SelectItem value="ZAAD">ZAAD</SelectItem>
             <SelectItem value="EVC_PLUS">EVC Plus</SelectItem>
             <SelectItem value="SAHAL">Sahal</SelectItem>
-            <SelectItem value="CARD">{t("card")}</SelectItem>
-          </SelectContent>
-        </Select>
+              <SelectItem value="CARD">{t("card")}</SelectItem>
+              <SelectItem value="CREDIT">{t("credit")}</SelectItem>
+            </SelectContent>
+          </Select>
         <Input
           type="date"
           value={fromDate}
@@ -259,6 +283,7 @@ export function SalesHistory() {
               <TableHead>{t("customer")}</TableHead>
               <TableHead>{t("paymentMethod")}</TableHead>
               <TableHead>{t("status")}</TableHead>
+              <TableHead>{t("remainingBalance")}</TableHead>
               <TableHead className="text-right">{t("total")}</TableHead>
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
@@ -266,14 +291,14 @@ export function SalesHistory() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <Skeleton className="h-4 w-full" />
                 </TableCell>
               </TableRow>
             ) : !data || data.sales.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="text-center py-8 text-muted-foreground"
                 >
                   <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -310,8 +335,21 @@ export function SalesHistory() {
                       <Badge variant="success">{t("completed")}</Badge>
                     )}
                   </TableCell>
+                  <TableCell>
+                    {sale.paymentMethod === "CREDIT" ? (
+                      <div className="flex flex-col gap-1">
+                        {creditStatusBadge(sale.creditStatus)}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-mono">
-                    ${sale.total.toFixed(2)}
+                    {sale.paymentMethod === "CREDIT" && sale.remainingBalance != null ? (
+                      <span>${sale.remainingBalance.toFixed(2)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -481,6 +519,20 @@ export function SalesHistory() {
                   </span>
                   <span>{paymentLabel(selectedSale.paymentMethod)}</span>
                 </div>
+                {selectedSale.paymentMethod === "CREDIT" && selectedSale.creditStatus && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t("status")}</span>
+                      <span>{creditStatusBadge(selectedSale.creditStatus)}</span>
+                    </div>
+                    {selectedSale.remainingBalance != null && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">{t("remainingBalance")}</span>
+                        <span className="font-mono">${selectedSale.remainingBalance.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
                     {t("amountPaid")}

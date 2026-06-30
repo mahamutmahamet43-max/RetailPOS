@@ -13,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Separator } from "@/components/ui/separator"
+import { CustomerCreditPanel } from "@/components/customers/customer-credit-panel"
 
 interface SaleItem {
   id: string
@@ -29,8 +31,21 @@ interface CustomerSale {
   total: number
   paymentMethod: string
   status: string
+  creditStatus: string | null
+  remainingBalance: number | null
   items: SaleItem[]
   cashier: { name: string } | null
+}
+
+interface CustomerPayment {
+  id: string
+  amount: number
+  paymentMethod: string
+  reference: string | null
+  notes: string | null
+  createdAt: string
+  cashier: { id: string; name: string } | null
+  sale: { saleNumber: string } | null
 }
 
 interface Customer {
@@ -46,11 +61,15 @@ interface Customer {
   notes: string | null
   creditLimit: number
   currentBalance: number
+  totalPaid: number
+  totalCreditSales: number
+  lastPaymentDate: string | null
   isActive: boolean
   createdAt: string
   storeId: string
   _count: { sales: number }
   sales: CustomerSale[]
+  payments: CustomerPayment[]
 }
 
 export default async function CustomerDetailPage({
@@ -148,6 +167,39 @@ export default async function CustomerDetailPage({
           </div>
         </CardContent>
       </Card>
+
+      {customer.currentBalance > 0 && customer.payments.length > 0 || customer.currentBalance > 0 || customer.totalCreditSales > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("creditSalesHistory")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div>
+                <div className="text-sm text-muted-foreground">{t("outstandingBalance")}</div>
+                <div className="text-2xl font-bold">${customer.currentBalance.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">{t("totalCreditSales")}</div>
+                <div className="text-2xl font-bold">${customer.totalCreditSales.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">{t("totalPaid")}</div>
+                <div className="text-2xl font-bold">${customer.totalPaid.toFixed(2)}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <CustomerCreditPanel
+        customerId={customer.id}
+        initialBalance={customer.currentBalance}
+        initialTotalPaid={customer.totalPaid}
+        initialTotalCreditSales={customer.totalCreditSales}
+        initialLastPaymentDate={customer.lastPaymentDate}
+        initialPayments={customer.payments}
+      />
 
       <Card>
         <CardHeader>

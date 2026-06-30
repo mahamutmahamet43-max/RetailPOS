@@ -99,7 +99,11 @@
     "totalRevenue": "Dakhliga Guud",
     "activeProducts": "Alaabta Shaqeeya",
     "totalCustomers": "Macmiilasha Guud",
-    "totalOrders": "Dalabka Guud"
+    "totalOrders": "Dalabka Guud",
+    "outstandingCredit": "Amaahda Harta",
+    "customersWithDebt": "Macmiilasha Amaahda Leh",
+    "todayCreditSales": "Amaahda Maanta",
+    "recentPayments": "Lacagihii Dhawaa"
   },
   "categories": {
     "title": "Qaybaha",
@@ -215,7 +219,21 @@
     "noSales": "Weli iib ma jiraan",
     "customerInfo": "Macluumaadka Macmiilka",
     "saleNumber": "Iibka #",
-    "cashier": "Kaashiyaha"
+    "cashier": "Kaashiyaha",
+    "outstandingBalance": "Haraaga Amaahda",
+    "creditSalesHistory": "Taariikhda Amaahda",
+    "paymentsReceived": "Lacagihii La Helay",
+    "receivePayment": "Qaado Lacag",
+    "paymentAmount": "Qadarka",
+    "paymentMethod": "Habka Lacagta",
+    "paymentReference": "Tixraac",
+    "paymentNotes": "Qoraalo",
+    "paymentCreated": "Lacagta si guul leh ayaa loo diiwaan geliyay",
+    "noPayments": "Weli lacag lama helin",
+    "totalPaid": "Wadartii La Bixiyay",
+    "totalCreditSales": "Amaahda Guud",
+    "lastPaymentDate": "Lacagtii Ugu Dambeysay",
+    "creditLimitExceeded": "Xadka amaahda waa dhaafay"
   },
   "inventory": {
     "title": "Kaydka",
@@ -344,7 +362,21 @@
     "items": "Alaabta",
     "lastPurchase": "Iibsashadii Ugu Dambeysay",
     "supplierName": "Magaca Keeniyaha",
-    "purchaseCount": "Iibsashooyinka"
+    "purchaseCount": "Iibsashooyinka",
+    "credit": "Amaah",
+    "creditReport": "Amaahda Macmiilka",
+    "outstandingBalances": "Haraaga Amaahda",
+    "overdueCustomers": "Macmiilasha Amaahda Leh",
+    "paymentsReceived": "Lacagihii La Helay",
+    "totalOutstanding": "Wadarta Haraaga",
+    "customersWithDebt": "Macmiilasha Amaahda Leh",
+    "todayCreditSales": "Amaahda Maanta",
+    "topDebtors": "Macmiilasha Amaahda Badan",
+    "balance": "Haraaga",
+    "creditLimit": "Xadka Amaahda",
+    "totalSales": "Iibka Guud",
+    "lastPayment": "Lacagtii Ugu Dambeysay",
+    "noCreditData": "Macluumaad amaah ah ma jiraan"
   },
   "sales": {
     "title": "Iibka",
@@ -411,7 +443,13 @@
     "expired": "WAQTII KAA BAXAY",
     "lowStock": "KAYDKA HOOSEEYA",
     "recentPurchases": "Iibsashadii Dhawaa",
-    "scanBarcodeTitle": "Qiiri Barcode-ka"
+    "scanBarcodeTitle": "Qiiri Barcode-ka",
+    "credit": "Amaah (Dib u Bixi)",
+    "creditWarning": "Iibkan waxaa lagu dari doonaa haraaga macmiilka.",
+    "unpaid": "Lacag La Bixin",
+    "partiallyPaid": "Qayb La Bixiyay",
+    "paid": "La Bixiyay",
+    "remainingBalance": "Haraaga"
   },
   "admin": {
     "title": "Maamulka Nidaamka",

@@ -88,10 +88,18 @@ export const saleItemSchema = z.object({
 export const saleSchema = z.object({
   items: z.array(saleItemSchema).min(1, "At least one item is required"),
   customerId: z.string().optional().nullable(),
-  paymentMethod: z.enum(["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD"]),
+  paymentMethod: z.enum(["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD", "CREDIT"]),
   amountPaid: z.number().min(0).default(0),
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),
+})
+
+export const customerPaymentSchema = z.object({
+  amount: z.number().positive("Amount must be positive"),
+  paymentMethod: z.enum(["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD"]),
+  reference: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  saleId: z.string().optional().nullable(),
 })
 
 export const inventorySchema = z.object({

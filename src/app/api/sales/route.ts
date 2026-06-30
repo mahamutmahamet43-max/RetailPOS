@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       storeId: store.id,
     }
 
-    if (payment && ["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD"].includes(payment)) {
+    if (payment && ["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD", "CREDIT"].includes(payment)) {
       where.paymentMethod = payment as Prisma.EnumPaymentMethodFilter["equals"]
     }
 
@@ -153,6 +153,30 @@ export async function POST(request: Request) {
       )
     }
 
+    if (paymentMethod === "CREDIT") {
+      if (!customerId) {
+        return NextResponse.json(
+          { error: "Customer is required for credit sales" },
+          { status: 400 }
+        )
+      }
+      const customer = await prisma.customer.findFirst({
+        where: { id: customerId, storeId: store.id },
+      })
+      if (!customer) {
+        return NextResponse.json(
+          { error: "Customer not found" },
+          { status: 404 }
+        )
+      }
+      if (customer.creditLimit > 0 && customer.currentBalance + saleTotal > customer.creditLimit) {
+        return NextResponse.json(
+          { error: `Credit limit exceeded. Balance: $${customer.currentBalance.toFixed(2)}, Limit: $${customer.creditLimit.toFixed(2)}` },
+          { status: 400 }
+        )
+      }
+    }
+
     const changeGiven = Math.max(0, paid - saleTotal)
 
     const lastSale = await prisma.sale.findFirst({
@@ -170,6 +194,12 @@ export async function POST(request: Request) {
 
     let saleId = ""
 
+    const isCredit = paymentMethod === "CREDIT"
+    const remainingBalance = isCredit ? saleTotal - paid : null
+    const creditStatus = isCredit
+      ? (remainingBalance! <= 0 ? "PAID" : paid > 0 ? "PARTIALLY_PAID" : "UNPAID")
+      : null
+
     await prisma.$transaction(async (tx) => {
       const createdSale = await tx.sale.create({
         data: {
@@ -179,9 +209,11 @@ export async function POST(request: Request) {
           tax,
           total: saleTotal,
           amountPaid: paid,
-          changeGiven,
+          changeGiven: isCredit ? 0 : changeGiven,
           paymentMethod,
           status: "COMPLETED",
+          creditStatus: creditStatus as any,
+          remainingBalance,
           storeId: store.id,
           customerId: customerId || null,
           cashierId: auth.userId,
@@ -235,6 +267,22 @@ export async function POST(request: Request) {
             createdBy: auth.userId,
           },
         })
+      }
+      if (isCredit && customerId) {
+        const cust = await tx.customer.findUnique({
+          where: { id: customerId },
+          select: { currentBalance: true, totalCreditSales: true },
+        })
+        if (cust) {
+          await tx.customer.update({
+            where: { id: customerId },
+            data: {
+              currentBalance: cust.currentBalance + remainingBalance!,
+              totalCreditSales: cust.totalCreditSales + saleTotal,
+              lastPaymentDate: paid > 0 ? new Date() : undefined,
+            },
+          })
+        }
       }
     })
 

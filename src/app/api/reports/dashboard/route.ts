@@ -20,7 +20,7 @@ const storeId = store.id
     const weekAgo = new Date(todayStart.getTime() - 6 * 86400000)
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [todaySales, weeklySales, monthlySales, totalRevenue, totalCustomers, totalProducts, lowStock, outOfStock] =
+    const [todaySales, weeklySales, monthlySales, totalRevenue, totalCustomers, totalProducts, lowStock, outOfStock, outstandingCredit, customersWithDebt, todayCreditSales, recentPayments] =
       await Promise.all([
         prisma.sale.aggregate({
           where: {
@@ -59,6 +59,30 @@ const storeId = store.id
           select: { stockQuantity: true, minimumStock: true },
         }).then((products) => products.filter((p) => p.minimumStock > 0 && p.stockQuantity > 0 && p.stockQuantity <= p.minimumStock).length),
         prisma.product.count({ where: { storeId, stockQuantity: 0 } }),
+        prisma.customer.aggregate({
+          where: { storeId },
+          _sum: { currentBalance: true },
+        }),
+        prisma.customer.count({
+          where: { storeId, currentBalance: { gt: 0 } },
+        }),
+        prisma.sale.aggregate({
+          where: {
+            storeId,
+            paymentMethod: "CREDIT",
+            status: "COMPLETED",
+            createdAt: { gte: todayStart, lt: todayEnd },
+          },
+          _sum: { total: true },
+        }),
+        prisma.customerPayment.findMany({
+          where: { storeId },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          include: {
+            customer: { select: { firstName: true, lastName: true } },
+          },
+        }),
       ])
 
     const todaySalesItems = await prisma.saleItem.aggregate({
@@ -85,6 +109,16 @@ const storeId = store.id
       totalProducts,
       lowStockProducts: lowStock,
       outOfStockProducts: outOfStock,
+      outstandingCredit: outstandingCredit._sum.currentBalance || 0,
+      customersWithDebt,
+      todayCreditSales: todayCreditSales._sum.total || 0,
+      recentPayments: recentPayments.map((p) => ({
+        id: p.id,
+        amount: p.amount,
+        paymentMethod: p.paymentMethod,
+        createdAt: p.createdAt,
+        customer: p.customer,
+      })),
     })
   } catch (error) {
     if (error instanceof Error && (error.message === "No store found" || error.message === "Unauthorized")) {

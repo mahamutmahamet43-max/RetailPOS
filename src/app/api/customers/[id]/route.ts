@@ -25,6 +25,14 @@ export async function GET(
           take: 20,
           include: { items: true, cashier: { select: { name: true } } },
         },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          include: {
+            cashier: { select: { id: true, name: true } },
+            sale: { select: { saleNumber: true } },
+          },
+        },
         _count: { select: { sales: true } },
       },
     })

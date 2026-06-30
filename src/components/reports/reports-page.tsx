@@ -10,6 +10,7 @@ import {
   UserCircle,
   ShoppingCart,
   Building2,
+  Banknote,
 } from "lucide-react"
 import { Loader2 } from "lucide-react"
 
@@ -34,6 +35,9 @@ const PurchasesTab = React.lazy(() =>
 const SuppliersTab = React.lazy(() =>
   import("./suppliers-tab").then((m) => ({ default: m.SuppliersTab }))
 )
+const CreditTab = React.lazy(() =>
+  import("./credit-tab").then((m) => ({ default: m.CreditTab }))
+)
 
 const TABS = [
   { id: "overview", label: "overview", icon: BarChart3, Component: OverviewTab },
@@ -43,6 +47,7 @@ const TABS = [
   { id: "suppliers", label: "suppliers", icon: Building2, Component: SuppliersTab },
   { id: "customers", label: "customers", icon: Users, Component: CustomersTab },
   { id: "cashiers", label: "cashiers", icon: UserCircle, Component: CashiersTab },
+  { id: "credit", label: "credit", icon: Banknote, Component: CreditTab },
 ] as const
 
 export function ReportsPage() {

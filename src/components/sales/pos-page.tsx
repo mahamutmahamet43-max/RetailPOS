@@ -415,6 +415,10 @@ export function PosPage() {
       setError(t("insufficientPayment"))
       return
     }
+    if (paymentMethod === "CREDIT" && !selectedCustomerId) {
+      setError("Customer is required for credit sales")
+      return
+    }
     setCheckingOut(true)
     setError("")
 
@@ -436,7 +440,7 @@ export function PosPage() {
           })),
           customerId: selectedCustomerId || null,
           paymentMethod,
-          amountPaid: paymentMethod === "CASH" ? parseFloat(amountPaid) : grandTotal,
+          amountPaid: paymentMethod === "CASH" ? parseFloat(amountPaid) : (paymentMethod === "CREDIT" ? (parseFloat(amountPaid) || 0) : grandTotal),
           discount: saleDiscount,
           tax: saleTax,
         }),
@@ -771,9 +775,18 @@ export function PosPage() {
                 <SelectItem value="EVC_PLUS">EVC Plus</SelectItem>
                 <SelectItem value="CASH">{t("cash")}</SelectItem>
                 <SelectItem value="CARD">{t("card")}</SelectItem>
+                <SelectItem value="CREDIT">{t("credit")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {paymentMethod === "CREDIT" && (
+            <div className="space-y-2">
+              <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-200">
+                {t("creditWarning")}
+              </div>
+            </div>
+          )}
 
           {paymentMethod === "CASH" && (
             <div className="space-y-2">

@@ -21,6 +21,7 @@ model User {
   accounts              Account[]
   inventoryTransactions InventoryTransaction[]
   sales                 Sale[]
+  customerPayments      CustomerPayment[]
   sessions              Session[]
   stores                Store[]
 }
@@ -35,6 +36,7 @@ model Store {
   ownerId               String
   categories            Category[]
   customers             Customer[]
+  customerPayments      CustomerPayment[]
   inventoryTransactions InventoryTransaction[]
   products              Product[]
   purchases             Purchase[]
@@ -86,23 +88,23 @@ model Payment {
 }
 
 model StoreSetting {
-  id               String   @id @default(cuid())
-  address          String?
-  phone            String?
-  email            String?
-  currency         String   @default("USD")
-  timezone         String   @default("UTC")
-  dateFormat       String   @default("MM/DD/YYYY")
-  lowStockAlert    Boolean  @default(true)
-  salesNotification Boolean @default(true)
-  emailNotification Boolean @default(true)
-  logoUrl          String?
-  twoFactorEnabled Boolean  @default(false)
-  enablePharmacyModule Boolean @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  storeId          String   @unique
-  store            Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(cuid())
+  address              String?
+  phone                String?
+  email                String?
+  currency             String   @default("USD")
+  timezone             String   @default("UTC")
+  dateFormat           String   @default("MM/DD/YYYY")
+  lowStockAlert        Boolean  @default(true)
+  salesNotification    Boolean  @default(true)
+  emailNotification    Boolean  @default(true)
+  logoUrl              String?
+  twoFactorEnabled     Boolean  @default(false)
+  enablePharmacyModule Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  storeId              String   @unique
+  store                Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
 }
 
 model Category {
@@ -154,24 +156,28 @@ model Product {
 }
 
 model Customer {
-  id             String   @id @default(cuid())
-  customerCode   String
-  firstName      String
-  lastName       String?
-  companyName    String?
-  phone          String
-  email          String?
-  address        String?
-  city           String?
-  notes          String?
-  creditLimit    Float    @default(0)
-  currentBalance Float    @default(0)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  storeId        String
-  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  sales          Sale[]
+  id               String            @id @default(cuid())
+  customerCode     String
+  firstName        String
+  lastName         String?
+  companyName      String?
+  phone            String
+  email            String?
+  address          String?
+  city             String?
+  notes            String?
+  creditLimit      Float             @default(0)
+  currentBalance   Float             @default(0)
+  totalPaid        Float             @default(0)
+  totalCreditSales Float             @default(0)
+  lastPaymentDate  DateTime?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  storeId          String
+  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sales            Sale[]
+  payments         CustomerPayment[]
 
   @@unique([storeId, customerCode])
   @@unique([storeId, phone])
@@ -180,22 +186,22 @@ model Customer {
 }
 
 model InventoryTransaction {
-  id               String           @id @default(cuid())
-  transactionType  TransactionType
-  quantity         Int
-  previousStock    Int
-  newStock         Int
-  reason           String
-  reference        String?
-  createdAt        DateTime         @default(now())
-  storeId          String
-  productId        String
-  createdBy        String
-  purchaseId       String?
-  creator          User             @relation(fields: [createdBy], references: [id])
-  product          Product          @relation(fields: [productId], references: [id])
-  store            Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  purchase         Purchase?        @relation(fields: [purchaseId], references: [id])
+  id              String          @id @default(cuid())
+  transactionType TransactionType
+  quantity        Int
+  previousStock   Int
+  newStock        Int
+  reason          String
+  reference       String?
+  createdAt       DateTime        @default(now())
+  storeId         String
+  productId       String
+  createdBy       String
+  purchaseId      String?
+  creator         User            @relation(fields: [createdBy], references: [id])
+  product         Product         @relation(fields: [productId], references: [id])
+  store           Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchase        Purchase?       @relation(fields: [purchaseId], references: [id])
 
   @@index([storeId, createdAt])
   @@index([productId])
@@ -203,24 +209,27 @@ model InventoryTransaction {
 }
 
 model Sale {
-  id            String        @id @default(cuid())
-  saleNumber    String
-  subtotal      Float
-  discount      Float         @default(0)
-  tax           Float         @default(0)
-  total         Float
-  amountPaid    Float
-  changeGiven   Float         @default(0)
-  paymentMethod PaymentMethod
-  status        SaleStatus    @default(COMPLETED)
-  createdAt     DateTime      @default(now())
-  storeId       String
-  customerId    String?
-  cashierId     String
-  cashier       User          @relation(fields: [cashierId], references: [id])
-  customer      Customer?     @relation(fields: [customerId], references: [id])
-  store         Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  items         SaleItem[]
+  id               String            @id @default(cuid())
+  saleNumber       String
+  subtotal         Float
+  discount         Float             @default(0)
+  tax              Float             @default(0)
+  total            Float
+  amountPaid       Float
+  changeGiven      Float             @default(0)
+  paymentMethod    PaymentMethod
+  status           SaleStatus        @default(COMPLETED)
+  creditStatus     CreditStatus?
+  remainingBalance Float?
+  createdAt        DateTime          @default(now())
+  storeId          String
+  customerId       String?
+  cashierId        String
+  cashier          User              @relation(fields: [cashierId], references: [id])
+  customer         Customer?         @relation(fields: [customerId], references: [id])
+  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items            SaleItem[]
+  payments         CustomerPayment[]
 
   @@unique([storeId, saleNumber])
   @@index([storeId, createdAt])
@@ -249,6 +258,26 @@ model SaleItem {
 
   @@index([saleId])
   @@index([productId])
+}
+
+model CustomerPayment {
+  id            String   @id @default(cuid())
+  amount        Float
+  paymentMethod String
+  reference     String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  customerId    String
+  cashierId     String
+  storeId       String
+  saleId        String?
+  customer      Customer @relation(fields: [customerId], references: [id])
+  cashier       User     @relation(fields: [cashierId], references: [id])
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sale          Sale?    @relation(fields: [saleId], references: [id])
+
+  @@index([customerId])
+  @@index([storeId, createdAt])
 }
 
 model Account {
@@ -286,34 +315,34 @@ model VerificationToken {
 }
 
 model Supplier {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   storeId   String
   name      String
   phone     String?
   email     String?
   address   String?
   notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
   purchases Purchase[]
 
   @@index([storeId])
 }
 
 model Purchase {
-  id            String          @id @default(cuid())
+  id            String                 @id @default(cuid())
   invoiceNumber String
   supplierId    String?
   supplierName  String
   notes         String?
   total         Float
-  status        PurchaseStatus  @default(PENDING)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  status        PurchaseStatus         @default(PENDING)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
   storeId       String
-  supplier      Supplier?       @relation(fields: [supplierId], references: [id])
-  store         Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  supplier      Supplier?              @relation(fields: [supplierId], references: [id])
+  store         Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
   items         PurchaseItem[]
   transactions  InventoryTransaction[]
 
@@ -322,17 +351,17 @@ model Purchase {
 }
 
 model PurchaseItem {
-  id                    String       @id @default(cuid())
-  purchaseId            String
-  productId             String
-  productName           String
-  productUnitId         String?
-  unitName              String       @default("pcs")
-  unitConversionFactor  Float        @default(1)
-  quantity              Int
-  costPrice             Float
-  purchase              Purchase     @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  productUnit           ProductUnit? @relation(fields: [productUnitId], references: [id])
+  id                   String       @id @default(cuid())
+  purchaseId           String
+  productId            String
+  productName          String
+  productUnitId        String?
+  unitName             String       @default("pcs")
+  unitConversionFactor Float        @default(1)
+  quantity             Int
+  costPrice            Float
+  purchase             Purchase     @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productUnit          ProductUnit? @relation(fields: [productUnitId], references: [id])
 
   @@index([purchaseId])
   @@index([productId])
@@ -414,6 +443,13 @@ enum PaymentMethod {
   EVC_PLUS
   SAHAL
   CARD
+  CREDIT
+}
+
+enum CreditStatus {
+  PAID
+  PARTIALLY_PAID
+  UNPAID
 }
 
 enum SaleStatus {

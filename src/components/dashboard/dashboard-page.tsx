@@ -9,6 +9,8 @@ import {
   ShoppingCart,
   TrendingUp,
   AlertTriangle,
+  Banknote,
+  CreditCard,
 } from "lucide-react"
 import {
   Card,
@@ -35,6 +37,10 @@ interface DashboardData {
   totalProducts: number
   lowStockProducts: number
   outOfStockProducts: number
+  outstandingCredit: number
+  customersWithDebt: number
+  todayCreditSales: number
+  recentPayments: { id: string; amount: number; paymentMethod: string; createdAt: string; customer: { firstName: string; lastName: string } | null }[]
 }
 
 interface ChartData {
@@ -169,7 +175,70 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium">{t("outstandingCredit")}</CardTitle>
+            <Banknote className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {data ? (
+              <div className="text-xl font-bold text-rose-600">${data.outstandingCredit.toFixed(2)}</div>
+            ) : (
+              <Skeleton className="h-7 w-20" />
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium">{t("customersWithDebt")}</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {data ? (
+              <div className="text-xl font-bold">{data.customersWithDebt}</div>
+            ) : (
+              <Skeleton className="h-7 w-12" />
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium">{t("todayCreditSales")}</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {data ? (
+              <div className="text-xl font-bold">${data.todayCreditSales.toFixed(2)}</div>
+            ) : (
+              <Skeleton className="h-7 w-20" />
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {data && data.recentPayments && data.recentPayments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">{t("recentPayments")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {data.recentPayments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between text-sm">
+                  <span>
+                    {p.customer
+                      ? `${p.customer.firstName} ${p.customer.lastName || ""}`
+                      : "—"}
+                  </span>
+                  <span className="font-mono font-medium text-green-600">
+                    +${p.amount.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <React.Suspense
         fallback={
