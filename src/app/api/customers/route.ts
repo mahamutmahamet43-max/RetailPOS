@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     if (!store) return noStoreResponse()
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search") || ""
+    const status = searchParams.get("status") || ""
     const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1)
     const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "10") || 10))
     const skip = (page - 1) * limit
