@@ -92,7 +92,22 @@ export async function POST(request: Request) {
     const validation = validateOrError(saleSchema, body)
     if (!validation.success) return validation.response
 
-    const { items, customerId, paymentMethod, amountPaid, discount, tax } = validation.data
+    const { items, customerId, paymentMethod, amountPaid, discount, tax, localId } = validation.data
+
+    if (localId) {
+      const existing = await prisma.sale.findUnique({ where: { localId } })
+      if (existing) {
+        const full = await prisma.sale.findUnique({
+          where: { id: existing.id },
+          include: {
+            items: { include: { productUnit: { select: { id: true, name: true } } } },
+            customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+            cashier: { select: { id: true, name: true } },
+          },
+        })
+        return NextResponse.json(full, { status: 201 })
+      }
+    }
 
     for (const item of items) {
       if (item.productUnitId) {
@@ -217,6 +232,7 @@ export async function POST(request: Request) {
           storeId: store.id,
           customerId: customerId || null,
           cashierId: auth.userId,
+          localId: localId || null,
           items: {
             create: items.map((item) => {
               const product = productMap.get(item.productId)!

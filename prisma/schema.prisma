@@ -221,6 +221,7 @@ model Sale {
   status           SaleStatus        @default(COMPLETED)
   creditStatus     CreditStatus?
   remainingBalance Float?
+  localId          String?           @unique
   createdAt        DateTime          @default(now())
   storeId          String
   customerId       String?

@@ -7,6 +7,8 @@ import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
+import { OfflineBanner } from "@/components/layout/offline-banner"
+import { SyncManager } from "@/components/layout/sync-manager"
 
 export default function DashboardLayout({
   children,
@@ -45,6 +47,8 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen">
+      <SyncManager />
+      <OfflineBanner />
       <DashboardSidebar />
 
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>

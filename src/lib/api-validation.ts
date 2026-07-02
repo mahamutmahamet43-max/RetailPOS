@@ -92,6 +92,7 @@ export const saleSchema = z.object({
   amountPaid: z.number().min(0).default(0),
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),
+  localId: z.string().optional().nullable(),
 })
 
 export const customerPaymentSchema = z.object({

@@ -13,6 +13,7 @@ import {
   X,
   User,
   Camera,
+  WifiOff,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,6 +42,14 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Receipt } from "@/components/sales/receipt"
+import { useOnlineStatus } from "@/hooks/use-online-status"
+import { addPendingSale } from "@/lib/sync-engine"
+import {
+  refreshCache,
+  getCachedProducts,
+  getCachedCustomers,
+  getCachedProductByBarcode,
+} from "@/lib/offline-service"
 
 interface ProductUnit {
   id: string
@@ -177,6 +186,8 @@ export function PosPage() {
   const [showScanner, setShowScanner] = React.useState(false)
   const [showReceipt, setShowReceipt] = React.useState(false)
   const [storeInfo, setStoreInfo] = React.useState({ name: "", address: "", phone: "" })
+  const [offlineDataLoaded, setOfflineDataLoaded] = React.useState(false)
+  const { isOnline, pendingCount } = useOnlineStatus()
   const barcodeRef = React.useRef<HTMLInputElement>(null)
   const searchRef = React.useRef<HTMLInputElement>(null)
 
@@ -196,7 +207,7 @@ export function PosPage() {
     if (barcodeRef.current) barcodeRef.current.focus()
     fetch("/api/settings/store")
       .then((r) => r.json())
-      .then((data) => {
+      .then(async (data) => {
         if (data.name) setStoreInfo({ name: data.name, address: data.settings?.address || "", phone: data.settings?.phone || "" })
         if (data.id) {
           migrateOldKeys(data.id)
@@ -209,6 +220,7 @@ export function PosPage() {
           setDiscount(savedMeta.discount)
           setTax(savedMeta.tax)
           setAmountPaid(savedMeta.amountPaid)
+          await refreshCache(data.id)
         }
       })
       .catch(() => {})
@@ -223,11 +235,21 @@ export function PosPage() {
   }, [storeId, selectedCustomerId, paymentMethod, discount, tax, amountPaid])
 
   React.useEffect(() => {
-    fetch("/api/customers?limit=1000")
-      .then((r) => r.json())
-      .then((data) => setCustomers(data.customers || []))
-      .catch(() => {})
-  }, [])
+    if (isOnline) {
+      fetch("/api/customers?limit=1000")
+        .then((r) => r.json())
+        .then((data) => setCustomers(data.customers || []))
+        .catch(() => loadOfflineCustomers())
+    } else {
+      loadOfflineCustomers()
+    }
+  }, [isOnline])
+
+  async function loadOfflineCustomers() {
+    const cached = await getCachedCustomers()
+    setCustomers(cached.map((c) => ({ id: c.id, firstName: c.firstName, lastName: c.lastName, phone: c.phone })))
+    setOfflineDataLoaded(true)
+  }
 
   React.useEffect(() => {
     if (!selectedCustomerId) {
@@ -270,43 +292,81 @@ export function PosPage() {
   async function handleBarcodeSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!barcode.trim()) return
-    try {
-      const res = await fetch(
-        `/api/products?search=${encodeURIComponent(barcode.trim())}&limit=1`
-      )
-      if (res.ok) {
-        const data = await res.json()
-        const product = data.products?.[0]
-        if (!product) {
-          toast.error(`No product found with barcode "${barcode.trim()}"`)
-        } else if (product.stockQuantity <= 0) {
-          toast.error(`"${product.name}" is out of stock`)
+    if (isOnline) {
+      try {
+        const res = await fetch(
+          `/api/products?search=${encodeURIComponent(barcode.trim())}&limit=1`
+        )
+        if (res.ok) {
+          const data = await res.json()
+          const product = data.products?.[0]
+          if (!product) {
+            toast.error(`No product found with barcode "${barcode.trim()}"`)
+          } else if (product.stockQuantity <= 0) {
+            toast.error(`"${product.name}" is out of stock`)
+          } else {
+            addToCart(product)
+          }
         } else {
-          addToCart(product)
+          toast.error("Barcode lookup failed")
         }
-      } else {
+      } catch {
         toast.error("Barcode lookup failed")
       }
-    } catch {
-      toast.error("Barcode lookup failed")
+    } else {
+      const cached = await getCachedProductByBarcode(barcode.trim())
+      if (!cached) {
+        toast.error(`No product found with barcode "${barcode.trim()}"`)
+      } else if (cached.stockQuantity <= 0) {
+        toast.error(`"${cached.name}" is out of stock`)
+      } else {
+        addToCart({
+          id: cached.id,
+          name: cached.name,
+          sku: cached.sku,
+          barcode: cached.barcode,
+          unit: cached.unit,
+          expiryDate: cached.expiryDate,
+          sellingPrice: cached.sellingPrice,
+          stockQuantity: cached.stockQuantity,
+          minimumStock: cached.minimumStock,
+          units: [],
+        })
+      }
     }
     setBarcode("")
     if (barcodeRef.current) barcodeRef.current.focus()
   }
 
   React.useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       if (!searchQuery.trim()) {
         setSearchResults([])
         return
       }
-      fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=10`)
-        .then((r) => r.json())
-        .then((data) => setSearchResults(data.products || []))
-        .catch(() => {})
+      if (isOnline) {
+        fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=10`)
+          .then((r) => r.json())
+          .then((data) => setSearchResults(data.products || []))
+          .catch(() => {})
+      } else {
+        const cached = await getCachedProducts(searchQuery)
+        setSearchResults(cached.map((p) => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          barcode: p.barcode,
+          unit: p.unit,
+          expiryDate: p.expiryDate,
+          sellingPrice: p.sellingPrice,
+          stockQuantity: p.stockQuantity,
+          minimumStock: p.minimumStock,
+          units: [],
+        })))
+      }
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [searchQuery, isOnline])
 
   function getDefaultUnit(product: ProductResult): { productUnitId: string | null; unitName: string; unitConversionFactor: number; unitPrice: number } {
     if (!product.units || product.units.length === 0) {
@@ -422,45 +482,58 @@ export function PosPage() {
     setCheckingOut(true)
     setError("")
 
-    try {
-      const res = await fetch("/api/sales", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart.map((item) => ({
-            productId: item.productId,
-            productName: item.productName,
-            barcode: item.barcode,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: item.discount,
-            productUnitId: item.productUnitId,
-            unitName: item.unitName,
-            unitConversionFactor: item.unitConversionFactor,
-          })),
-          customerId: selectedCustomerId || null,
-          paymentMethod,
-          amountPaid: paymentMethod === "CASH" ? parseFloat(amountPaid) : (paymentMethod === "CREDIT" ? (parseFloat(amountPaid) || 0) : grandTotal),
-          discount: saleDiscount,
-          tax: saleTax,
-        }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        setError(data.error || common("error"))
-        return
-      }
-
-      const sale = await res.json()
-      setLastSale(sale)
-      clearCart()
-      setShowReceipt(true)
-    } catch {
-      setError(common("error"))
-    } finally {
-      setCheckingOut(false)
+    const localId = crypto.randomUUID()
+    const salePayload = {
+      items: cart.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        barcode: item.barcode,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        productUnitId: item.productUnitId,
+        unitName: item.unitName,
+        unitConversionFactor: item.unitConversionFactor,
+      })),
+      customerId: selectedCustomerId || null,
+      paymentMethod,
+      amountPaid: paymentMethod === "CASH" ? parseFloat(amountPaid) : (paymentMethod === "CREDIT" ? (parseFloat(amountPaid) || 0) : grandTotal),
+      discount: saleDiscount,
+      tax: saleTax,
+      localId,
     }
+
+    await addPendingSale(localId, salePayload)
+
+    if (isOnline) {
+      try {
+        const res = await fetch("/api/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(salePayload),
+        })
+
+        if (!res.ok) {
+          const data = await res.json()
+          setError(data.error || common("error"))
+          setCheckingOut(false)
+          return
+        }
+
+        const sale = await res.json()
+        setLastSale(sale)
+        clearCart()
+        setShowReceipt(true)
+        setCheckingOut(false)
+        return
+      } catch {
+        // Network failed during API call - sale is safely saved in IndexedDB
+      }
+    }
+
+    toast.success("Sale saved offline. It will sync when connected.")
+    clearCart()
+    setCheckingOut(false)
   }
 
   function handlePrintReceipt() {
@@ -805,6 +878,13 @@ export function PosPage() {
                   {t("change")}: {t("currencySymbol")}{changeGiven.toFixed(2)}
                 </p>
               )}
+            </div>
+          )}
+
+          {!isOnline && (
+            <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+              <WifiOff className="h-4 w-4" />
+              <span>Offline — {pendingCount} pending sync</span>
             </div>
           )}
 
