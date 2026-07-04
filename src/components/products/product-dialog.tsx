@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { Product, CategoryInfo, ProductUnitInfo } from "./products-table"
+import { BarcodeLookupButton } from "./barcode-scanner"
 
 interface UnitRow {
   key: string
@@ -82,6 +84,7 @@ export function ProductDialog({
   const [units, setUnits] = React.useState<UnitRow[]>([])
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState("")
+  const [lookupLoading, setLookupLoading] = React.useState(false)
 
   React.useEffect(() => {
     if (open) {
@@ -117,6 +120,38 @@ export function ProductDialog({
       setError("")
     }
   }, [open, product])
+
+  async function handleBarcodeScanned(barcode: string) {
+    setBarcode(barcode)
+    setLookupLoading(true)
+    try {
+      const res = await fetch("/api/products/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barcode }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.name) setName(data.name)
+        if (data.brand) setBrand(data.brand)
+        if (data.description) setDescription(data.description)
+        if (data.image) setImage(data.image)
+        if (data.category) {
+          const match = categories.find(
+            (c) => c.name.toLowerCase() === data.category.toLowerCase()
+          )
+          if (match) setCategoryId(match.id)
+        }
+      } else if (res.status !== 404) {
+        const data = await res.json()
+        toast.error(data.error || "Lookup failed")
+      }
+    } catch {
+      toast.error("Barcode lookup failed")
+    } finally {
+      setLookupLoading(false)
+    }
+  }
 
   async function fetchCategories() {
     try {
@@ -275,12 +310,17 @@ export function ProductDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="p-barcode">{t("barcode")}</Label>
-                <Input
-                  id="p-barcode"
-                  value={barcode}
-                  onChange={(e) => setBarcode(e.target.value)}
-                  placeholder={t("barcodePlaceholder")}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="p-barcode"
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value)}
+                    placeholder={t("barcodePlaceholder")}
+                    className="flex-1"
+                  />
+                  <BarcodeLookupButton onBarcodeScanned={handleBarcodeScanned} />
+                  {lookupLoading && <Loader2 className="h-4 w-4 animate-spin mt-3" />}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="p-sku">{t("sku")}</Label>
