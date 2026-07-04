@@ -71,7 +71,7 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     async jwt({ token, user, trigger }) {
       if (user) {
-        token.id = user.id
+        token.id = user.id ?? ""
       }
 
       // Only query DB on sign-in or explicit session update (runs in Node runtime).
@@ -81,12 +81,25 @@ export const authConfig: NextAuthConfig = {
 
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { role: true, emailVerified: true },
+          select: {
+            role: true,
+            emailVerified: true,
+            stores: {
+              select: {
+                subscription: {
+                  select: { status: true, endsAt: true },
+                },
+              },
+            },
+          },
         })
 
         if (dbUser) {
           token.role = dbUser.role
           token.emailVerified = !!dbUser.emailVerified
+          const sub = dbUser.stores?.[0]?.subscription
+          token.subscriptionStatus = sub?.status ?? undefined
+          token.subscriptionEndsAt = sub?.endsAt?.toISOString() ?? undefined
         }
       }
       return token
@@ -97,6 +110,8 @@ export const authConfig: NextAuthConfig = {
         user.id = token.id as string
         user.role = token.role as string
         user.emailVerified = token.emailVerified as boolean
+        user.subscriptionStatus = token.subscriptionStatus as string
+        user.subscriptionEndsAt = token.subscriptionEndsAt as string
       }
       return session
     },

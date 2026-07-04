@@ -95,6 +95,16 @@ export default async function middleware(req: NextRequest) {
       const verifyUrl = new URL(`/${locale}/verify-email`, req.url)
       return Response.redirect(verifyUrl)
     }
+
+    if (isDashboardPage && isLoggedIn && !pathnameWithoutLocale.startsWith("/dashboard/billing")) {
+      const subStatus = session?.subscriptionStatus as string | undefined
+      const subEndsAt = session?.subscriptionEndsAt as string | undefined
+      const isExpired = subStatus === "EXPIRED" || subStatus === "SUSPENDED" || subStatus === "CANCELLED"
+      const isTrialExpired = subStatus === "TRIAL" && subEndsAt && new Date(subEndsAt) < new Date()
+      if (isExpired || isTrialExpired) {
+        return Response.redirect(new URL(`/${locale}/dashboard/billing`, req.url))
+      }
+    }
   }
 
   return intlMiddleware(req)

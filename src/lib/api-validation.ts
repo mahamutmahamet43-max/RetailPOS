@@ -153,6 +153,23 @@ export const productUpdateSchema = productSchema.partial()
 export const categoryUpdateSchema = categorySchema.partial()
 export const customerUpdateSchema = customerSchema.partial()
 export const supplierUpdateSchema = supplierSchema.partial()
+export const billingSubscribeSchema = z.object({
+  plan: z.enum(["FREE", "BASIC", "PRO", "ENTERPRISE"]),
+  provider: z.enum(["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]).optional(),
+  billingCycle: z.enum(["MONTHLY", "YEARLY"]).optional(),
+  paymentReference: z.string().optional(),
+  customerPhone: z.string().optional(),
+  customerEmail: z.string().email().optional().or(z.literal("")),
+})
+
+export const billingRenewSchema = z.object({
+  provider: z.enum(["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]),
+  billingCycle: z.enum(["MONTHLY", "YEARLY"]),
+  paymentReference: z.string().optional(),
+  customerPhone: z.string().optional(),
+  customerEmail: z.string().email().optional().or(z.literal("")),
+})
+
 export const saleActionSchema = z.object({
   action: z.literal("void"),
 })

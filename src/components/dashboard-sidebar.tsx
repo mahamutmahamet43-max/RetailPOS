@@ -17,6 +17,7 @@ import {
   Truck,
   ClipboardList,
   Database,
+  CreditCard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -29,6 +30,7 @@ const sidebarItems = [
   { href: "/dashboard/customers", label: "customers", icon: Users },
   { href: "/dashboard/sales", label: "sales", icon: ShoppingCart },
   { href: "/dashboard/reports", label: "reports", icon: BarChart3 },
+  { href: "/dashboard/billing", label: "billing", icon: CreditCard },
   { href: "/dashboard/settings", label: "settings", icon: Settings },
 ] as const
 
