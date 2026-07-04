@@ -19,6 +19,9 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "@prisma/client": "^6",
     "@radix-ui/react-avatar": "latest",
     "@radix-ui/react-checkbox": "latest",
