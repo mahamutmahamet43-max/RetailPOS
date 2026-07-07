@@ -78,11 +78,11 @@ export async function POST(request: Request) {
 
     const emailResult = await sendVerifyEmailEmail(user.email, user.name || "User", verifyUrl)
 
-    logger.info("User registered", { userId: user.id, email: user.email, emailSent: emailResult.success })
+    logger.info("User registered", { userId: user.id, email: user.email, emailSent: emailResult.success, emailError: emailResult.error })
 
     const message = emailResult.success
       ? "Registration successful. Please check your email to verify your account."
-      : "Account created. We couldn't send the verification email. Please try again later."
+      : `Account created but verification email failed: ${emailResult.error || "unknown error"}. Please try resending.`
 
     return NextResponse.json(
       {
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
         email: user.email,
         emailSent: emailResult.success,
       },
-      { status: emailResult.success ? 201 : 201 }
+      { status: 201 }
     )
   } catch (error) {
     logger.error("Registration error", error instanceof Error ? error : undefined)

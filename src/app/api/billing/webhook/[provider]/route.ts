@@ -4,7 +4,7 @@ import { getPaymentProviderByName } from "@/lib/payment/registry"
 import crypto from "crypto"
 
 function isValidProvider(provider: string): boolean {
-  return ["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"].includes(provider.toUpperCase())
+  return ["SAHAL", "STRIPE"].includes(provider.toUpperCase())
 }
 
 export async function POST(

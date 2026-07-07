@@ -1,7 +1,5 @@
 import type { PaymentProvider, ProviderName } from "./types"
-import { ZaadProvider } from "./zaad"
-import { EvcPlusProvider } from "./evc-plus"
-import { SahalProvider } from "./sahal"
+import { SifaloPayProvider } from "./sifalo"
 import { StripeProvider } from "./stripe"
 
 const instances: Partial<Record<ProviderName, PaymentProvider>> = {}
@@ -15,20 +13,18 @@ function getInstance<T extends PaymentProvider>(name: ProviderName, ctor: new ()
 
 export function getPaymentProvider(name: ProviderName): PaymentProvider {
   switch (name) {
-    case "ZAAD":
-      return getInstance("ZAAD", ZaadProvider)
-    case "EVC_PLUS":
-      return getInstance("EVC_PLUS", EvcPlusProvider)
     case "SAHAL":
-      return getInstance("SAHAL", SahalProvider)
+      return getInstance("SAHAL", SifaloPayProvider)
     case "STRIPE":
       return getInstance("STRIPE", StripeProvider)
+    default:
+      throw new Error(`Unknown payment provider: ${name}`)
   }
 }
 
 export function getPaymentProviderByName(name: string): PaymentProvider {
   const upper = name.toUpperCase() as ProviderName
-  const valid = ["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]
+  const valid = ["SAHAL", "STRIPE"]
   if (!valid.includes(upper)) {
     throw new Error(`Unknown payment provider: ${name}`)
   }
@@ -36,5 +32,5 @@ export function getPaymentProviderByName(name: string): PaymentProvider {
 }
 
 export function listProviders(): ProviderName[] {
-  return ["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]
+  return ["SAHAL", "STRIPE"]
 }

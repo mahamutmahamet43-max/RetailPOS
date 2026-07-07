@@ -393,6 +393,7 @@ enum SubscriptionPlan {
   FREE
   BASIC
   PRO
+  PREMIUM
   STARTER
   PROFESSIONAL
   ENTERPRISE

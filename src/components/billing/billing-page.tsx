@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
-import { Check, X, Loader2 } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { Check, Loader2, CreditCard } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -13,13 +14,6 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -61,36 +55,38 @@ interface SubscriptionData {
   payments: Payment[]
 }
 
-const FEATURES: Record<string, { label: string; free: boolean; basic: boolean; premium: boolean }[]> = {
-  en: [
-    { label: "Up to 100 products", free: true, basic: true, premium: true },
-    { label: "Up to 2 users", free: true, basic: true, premium: true },
-    { label: "Up to 2,000 products", free: false, basic: true, premium: true },
-    { label: "Up to 5 users", free: false, basic: true, premium: true },
-    { label: "Unlimited products", free: false, basic: false, premium: true },
-    { label: "Unlimited users", free: false, basic: false, premium: true },
-    { label: "Full POS", free: true, basic: true, premium: true },
-    { label: "Inventory Management", free: true, basic: true, premium: true },
-    { label: "Basic Reports", free: true, basic: true, premium: true },
-    { label: "Advanced Reports", free: false, basic: false, premium: true },
-    { label: "Priority Support", free: false, basic: false, premium: true },
-  ],
+const ALL_FEATURES = [
+  "POS Sales & Checkout",
+  "Inventory Management",
+  "Product Management",
+  "Customer Management",
+  "Supplier Management",
+  "Purchase Management",
+  "Advanced Reports & Analytics",
+  "Multi-User Access",
+  "Barcode Scanning",
+  "Sales History & Refunds",
+  "Backup & Restore",
+  "API Access",
+  "Priority Support",
+]
+
+function getPlanPrice(plans: Plan[], planId: string): number {
+  return plans.find((p) => p.id === planId)?.monthlyPrice ?? 20
 }
 
 export function BillingPage() {
   const t = useTranslations("billing")
   const common = useTranslations("common")
+  const searchParams = useSearchParams()
 
   const [plans, setPlans] = React.useState<Plan[]>([])
   const [subData, setSubData] = React.useState<SubscriptionData | null>(null)
   const [storeName, setStoreName] = React.useState("")
   const [loading, setLoading] = React.useState(true)
   const [actionLoading, setActionLoading] = React.useState<string | null>(null)
-  const [selectedProvider, setSelectedProvider] = React.useState("ZAAD")
   const [error, setError] = React.useState("")
   const [success, setSuccess] = React.useState("")
-
-  const features = FEATURES.en
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
@@ -119,8 +115,26 @@ export function BillingPage() {
     fetchData()
   }, [fetchData])
 
-  async function handleSubscribe(planId: string) {
-    setActionLoading(planId)
+  React.useEffect(() => {
+    const successParam = searchParams.get("success")
+    const errorParam = searchParams.get("error")
+    const sessionId = searchParams.get("session_id")
+    if (sessionId || successParam === "payment_completed" || successParam === "already_active") {
+      setSuccess(t("planUpdated"))
+      fetchData()
+    } else if (errorParam === "payment_failed" || searchParams.get("canceled") === "true") {
+      setError(t("paymentFailed"))
+    } else if (errorParam === "payment_pending") {
+      setSuccess(t("paymentPending"))
+    } else if (errorParam) {
+      setError(t("paymentError"))
+    }
+  }, [searchParams, t, fetchData])
+
+  const isActive = true // TEMPORARILY UNLOCKED - revert to: subData?.status === "ACTIVE"
+
+  async function handleSubscribe() {
+    setActionLoading("subscribe")
     setError("")
     setSuccess("")
     try {
@@ -128,13 +142,17 @@ export function BillingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          plan: planId,
-          provider: planId === "FREE" ? undefined : selectedProvider,
+          plan: "PREMIUM",
+          provider: "SAHAL",
         }),
       })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error || common("error"))
+        return
+      }
+      if (data.payment?.checkoutUrl) {
+        window.location.href = data.payment.checkoutUrl
         return
       }
       setSuccess(t("planUpdated"))
@@ -166,40 +184,6 @@ export function BillingPage() {
     }
   }
 
-  async function handleRenew() {
-    setActionLoading("renew")
-    setError("")
-    setSuccess("")
-    try {
-      const res = await fetch("/api/billing/renew", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: selectedProvider }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || common("error"))
-        return
-      }
-      setSuccess(t("planRenewed"))
-      fetchData()
-    } catch {
-      setError(common("error"))
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
-  const providerLabel = (p: string) => {
-    const map: Record<string, string> = {
-      ZAAD: "ZAAD",
-      EVC_PLUS: "EVC Plus",
-      SAHAL: "Sahal",
-      STRIPE: "Stripe",
-    }
-    return map[p] || p
-  }
-
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {
       TRIAL: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100",
@@ -224,7 +208,7 @@ export function BillingPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-2xl mx-auto space-y-8">
       {error && (
         <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg text-sm">
           {error}
@@ -236,18 +220,33 @@ export function BillingPage() {
         </div>
       )}
 
-      {subData && (
+      {subData && subData.status !== "ACTIVE" && (
+        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
+          <CardHeader>
+            <CardTitle className="text-lg text-amber-800 dark:text-amber-200">
+              {t("subscriptionRequired")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-amber-700 dark:text-amber-300 text-sm">
+              {t("payToUnlock")}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {subData && isActive && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">{t("currentPlan")}</CardTitle>
             <CardDescription>{storeName}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-sm text-muted-foreground">{t("plan")}</p>
                 <p className="text-lg font-semibold">
-                  {t(subData.plan.toLowerCase())}
+                  {t("premium")}
                 </p>
               </div>
               <div>
@@ -256,148 +255,74 @@ export function BillingPage() {
                   {t(subData.status.toLowerCase())}
                 </Badge>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t("renewalDate")}</p>
-                <p className="text-sm">
-                  {subData.renewalDate
-                    ? new Date(subData.renewalDate).toLocaleDateString()
-                    : "—"}
-                </p>
-              </div>
-              {subData.status === "TRIAL" && (
+              {subData.renewalDate && (
                 <div>
-                  <p className="text-sm text-muted-foreground">{t("trialEnds")}</p>
-                  <p className="text-sm font-medium">
-                    {subData.trialDaysRemaining > 0
-                      ? `${subData.trialDaysRemaining} ${t("daysLeft")}`
-                      : t("expired")}
+                  <p className="text-sm text-muted-foreground">{t("renewalDate")}</p>
+                  <p className="text-sm">
+                    {new Date(subData.renewalDate).toLocaleDateString()}
                   </p>
                 </div>
               )}
             </div>
           </CardContent>
           <CardFooter className="flex gap-2">
-            {subData.status !== "CANCELLED" && subData.status !== "EXPIRED" && (
-              <Button variant="destructive" size="sm" onClick={handleCancel} disabled={actionLoading === "cancel"}>
-                {actionLoading === "cancel" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {t("cancelPlan")}
-              </Button>
-            )}
-            {(subData.status === "EXPIRED" || subData.status === "CANCELLED") && (
-              <Button size="sm" onClick={handleRenew} disabled={actionLoading === "renew"}>
-                {actionLoading === "renew" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {t("renewPlan")}
-              </Button>
-            )}
+            <Button variant="destructive" size="sm" onClick={handleCancel} disabled={actionLoading === "cancel"}>
+              {actionLoading === "cancel" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {t("cancelPlan")}
+            </Button>
           </CardFooter>
         </Card>
       )}
 
-      <div>
-        <h2 className="text-xl font-bold mb-4">{t("planComparison")}</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {plans
-            .filter((p) => p.id !== "ENTERPRISE")
-            .map((plan) => {
-              const isCurrent = subData?.plan === plan.id
-              const isFree = plan.id === "FREE"
-              return (
-                <Card
-                  key={plan.id}
-                  className={`relative ${isCurrent ? "border-primary ring-1 ring-primary" : ""}`}
-                >
-                  {isCurrent && (
-                    <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                      {t("current")}
-                    </Badge>
-                  )}
-                  <CardHeader>
-                    <CardTitle>{t(plan.id.toLowerCase())}</CardTitle>
-                    <CardDescription>
-                      {isFree ? (
-                        <span className="text-2xl font-bold text-foreground">
-                          {t("free")}
-                        </span>
-                      ) : (
-                        <span>
-                          <span className="text-3xl font-bold text-foreground">
-                            ${plan.monthlyPrice}
-                          </span>
-                          <span className="text-muted-foreground">
-                            /{t("month")}
-                          </span>
-                        </span>
-                      )}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {features.map((feat, i) => {
-                      const included =
-                        plan.id === "PRO"
-                          ? feat.premium
-                          : plan.id === "BASIC"
-                            ? feat.basic
-                            : feat.free
-                      return (
-                        <div key={i} className="flex items-center gap-2 text-sm">
-                          {included ? (
-                            <Check className="h-4 w-4 text-green-500 shrink-0" />
-                          ) : (
-                            <X className="h-4 w-4 text-muted-foreground shrink-0" />
-                          )}
-                          <span
-                            className={
-                              included ? "" : "text-muted-foreground"
-                            }
-                          >
-                            {feat.label}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </CardContent>
-                  <CardFooter>
-                    {!isCurrent && (
-                      <Button
-                        className="w-full"
-                        variant={isFree ? "outline" : "default"}
-                        onClick={() => handleSubscribe(plan.id)}
-                        disabled={actionLoading === plan.id}
-                      >
-                        {actionLoading === plan.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : null}
-                        {isFree ? t("downgradeToFree") : t("upgrade")}
-                      </Button>
-                    )}
-                  </CardFooter>
-                </Card>
-              )
-            })}
-        </div>
-
-        {subData && subData.plan !== "FREE" && (
-          <div className="mt-4 flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {t("payWith")}
+      <Card className={isActive ? "border-primary ring-1 ring-primary" : ""}>
+        <CardHeader>
+          <CardTitle>
+            {t("premium")}
+          </CardTitle>
+          <CardDescription>
+            <span className="text-3xl font-bold text-foreground">
+              $20
             </span>
-            <Select
-              value={selectedProvider}
-              onValueChange={setSelectedProvider}
+            <span className="text-muted-foreground">
+              /{t("month")}
+            </span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {ALL_FEATURES.map((feat, i) => (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              {isActive ? (
+                <Check className="h-4 w-4 text-green-500 shrink-0" />
+              ) : (
+                <span className="text-lg">🔒</span>
+              )}
+              <span className={isActive ? "" : "text-muted-foreground"}>
+                {feat}
+              </span>
+            </div>
+          ))}
+        </CardContent>
+        <CardFooter>
+          {isActive ? (
+            <Button className="w-full" variant="outline" disabled>
+              {t("current")}
+            </Button>
+          ) : (
+            <Button
+              className="w-full"
+              onClick={handleSubscribe}
+              disabled={actionLoading === "subscribe"}
             >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ZAAD">ZAAD</SelectItem>
-                <SelectItem value="EVC_PLUS">EVC Plus</SelectItem>
-                <SelectItem value="SAHAL">Sahal</SelectItem>
-                <SelectItem value="STRIPE">Stripe</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </div>
+              {actionLoading === "subscribe" ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CreditCard className="h-4 w-4 mr-2" />
+              )}
+              {t("subscribeCard")}
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
 
       {subData && subData.payments.length > 0 && (
         <Card>
@@ -411,7 +336,6 @@ export function BillingPage() {
                   <TableHead>{t("date")}</TableHead>
                   <TableHead>{t("amount")}</TableHead>
                   <TableHead>{t("currency")}</TableHead>
-                  <TableHead>{t("paymentMethod")}</TableHead>
                   <TableHead>{t("status")}</TableHead>
                   <TableHead>{t("reference")}</TableHead>
                 </TableRow>
@@ -426,7 +350,6 @@ export function BillingPage() {
                       ${p.amount.toFixed(2)}
                     </TableCell>
                     <TableCell>{p.currency}</TableCell>
-                    <TableCell>{providerLabel(p.provider)}</TableCell>
                     <TableCell>
                       <Badge className={`${statusBadge(p.status)} border-0`}>
                         {t(p.status.toLowerCase())}

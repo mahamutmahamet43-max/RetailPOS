@@ -154,8 +154,8 @@ export const categoryUpdateSchema = categorySchema.partial()
 export const customerUpdateSchema = customerSchema.partial()
 export const supplierUpdateSchema = supplierSchema.partial()
 export const billingSubscribeSchema = z.object({
-  plan: z.enum(["FREE", "BASIC", "PRO", "ENTERPRISE"]),
-  provider: z.enum(["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]).optional(),
+  plan: z.enum(["PREMIUM"]),
+  provider: z.enum(["SAHAL", "STRIPE"]).optional(),
   billingCycle: z.enum(["MONTHLY", "YEARLY"]).optional(),
   paymentReference: z.string().optional(),
   customerPhone: z.string().optional(),
@@ -163,7 +163,8 @@ export const billingSubscribeSchema = z.object({
 })
 
 export const billingRenewSchema = z.object({
-  provider: z.enum(["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]),
+  plan: z.enum(["PREMIUM"]).optional(),
+  provider: z.enum(["SAHAL", "STRIPE"]),
   billingCycle: z.enum(["MONTHLY", "YEARLY"]),
   paymentReference: z.string().optional(),
   customerPhone: z.string().optional(),

@@ -15,25 +15,11 @@ function isSandbox(): boolean {
 }
 
 const PROVIDER_CONFIGS: Record<ProviderName, () => PaymentProviderConfig> = {
-  ZAAD: () => ({
-    apiKey: process.env.ZAAD_API_KEY,
-    apiSecret: process.env.ZAAD_API_SECRET,
-    webhookSecret: process.env.ZAAD_WEBHOOK_SECRET || process.env.ZAAD_API_SECRET,
-    baseUrl: process.env.ZAAD_API_URL || "https://api.zaad.so",
-    sandbox: isSandbox(),
-  }),
-  EVC_PLUS: () => ({
-    apiKey: process.env.EVC_PLUS_API_KEY,
-    apiSecret: process.env.EVC_PLUS_API_SECRET,
-    webhookSecret: process.env.EVC_PLUS_WEBHOOK_SECRET || process.env.EVC_PLUS_API_SECRET,
-    baseUrl: process.env.EVC_PLUS_API_URL || "https://api.evcplus.so",
-    sandbox: isSandbox(),
-  }),
   SAHAL: () => ({
-    apiKey: process.env.SAHAL_API_KEY,
-    apiSecret: process.env.SAHAL_API_SECRET,
-    webhookSecret: process.env.SAHAL_WEBHOOK_SECRET || process.env.SAHAL_API_SECRET,
-    baseUrl: process.env.SAHAL_API_URL || "https://api.sahal.so",
+    apiKey: process.env.SIFALO_API_KEY || process.env.SAHAL_API_KEY,
+    apiSecret: process.env.SIFALO_API_SECRET || process.env.SAHAL_API_SECRET,
+    webhookSecret: process.env.SIFALO_WEBHOOK_SECRET || process.env.SAHAL_WEBHOOK_SECRET,
+    baseUrl: "https://api.sifalopay.com/gateway",
     sandbox: isSandbox(),
   }),
   STRIPE: () => ({

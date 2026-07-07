@@ -62,10 +62,7 @@ export function getPaymentProvider(provider: string): PaymentProvider {
 export { getPaymentProviderByName as getRawPaymentProvider }
 
 export const PLAN_PRICING: Record<string, { monthly: number; label: string }> = {
-  FREE: { monthly: 0, label: "Free Trial" },
-  BASIC: { monthly: 15, label: "Basic" },
-  PRO: { monthly: 29, label: "Pro" },
-  ENTERPRISE: { monthly: 99, label: "Enterprise" },
+  PREMIUM: { monthly: 20, label: "Premium" },
 }
 
 export function getPlanLimits(planId: string) {
@@ -82,8 +79,5 @@ export function getPlanLimits(planId: string) {
 }
 
 export const PLAN_LIMITS: Record<string, { products: number; users: number; reports: string }> = {
-  FREE: { products: 100, users: 2, reports: "Basic" },
-  BASIC: { products: 5000, users: 10, reports: "Full" },
-  PRO: { products: 10000, users: 20, reports: "Advanced" },
-  ENTERPRISE: { products: -1, users: -1, reports: "Advanced" },
+  PREMIUM: { products: -1, users: -1, reports: "Advanced" },
 }

@@ -45,9 +45,15 @@ export default function RegisterPage() {
         body: JSON.stringify({ name, email, password }),
       })
 
+      const data = await res.json()
+
       if (!res.ok) {
-        const data = await res.json()
         setError(data.error || t("emailInUse"))
+        return
+      }
+
+      if (data.emailSent === false) {
+        setError(data.message || "Account created but verification email could not be sent.")
         return
       }
 
@@ -82,14 +88,19 @@ export default function RegisterPage() {
               </p>
               <Button
                 variant="outline"
-                onClick={async () => {
-                  const res = await fetch("/api/auth/verify-email/send", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email: registeredEmail }),
-                  })
-                  if (res.ok) alert("Verification email resent!")
-                }}
+                  onClick={async () => {
+                    const res = await fetch("/api/auth/verify-email/send", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ email: registeredEmail }),
+                    })
+                    const data = await res.json()
+                    if (res.ok) {
+                      alert("Verification email sent!")
+                    } else {
+                      alert(data.error || "Failed to send verification email")
+                    }
+                  }}
               >
                 {t("verifyEmailResend") || "Resend email"}
               </Button>

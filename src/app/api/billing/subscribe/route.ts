@@ -28,35 +28,8 @@ export async function POST(request: Request) {
       where: { storeId: store.id },
     })
 
-    if (plan === "FREE") {
-      const startDate = new Date()
-      const trialEnd = new Date(startDate.getTime() + 14 * 86400000)
-
-      const subscription = existing
-        ? await prisma.subscription.update({
-            where: { id: existing.id },
-            data: {
-              plan: "FREE",
-              status: "TRIAL",
-              startsAt: startDate,
-              trialEndsAt: trialEnd,
-              endsAt: trialEnd,
-              renewalDate: null,
-              billingCycle: null,
-            },
-          })
-        : await prisma.subscription.create({
-            data: {
-              plan: "FREE",
-              status: "TRIAL",
-              startsAt: startDate,
-              trialEndsAt: trialEnd,
-              endsAt: trialEnd,
-              storeId: store.id,
-            },
-          })
-
-      return NextResponse.json({ subscription })
+    if (existing && plan === "PREMIUM" && existing.status === "ACTIVE") {
+      return NextResponse.json({ subscription: existing, message: "Already active" })
     }
 
     if (!provider) {

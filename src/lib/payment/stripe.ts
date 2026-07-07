@@ -15,16 +15,17 @@ export class StripeProvider implements PaymentProvider {
     const ref = generateRef("STRIPE")
 
     // Build Stripe Checkout Session via fetch
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+
     try {
       const body = new URLSearchParams({
-        "mode": "subscription",
+        "mode": "payment",
         "line_items[0][price_data][currency]": params.currency.toLowerCase(),
         "line_items[0][price_data][product_data][name]": params.description,
         "line_items[0][price_data][unit_amount]": String(Math.round(params.amount * 100)),
-        "line_items[0][price_data][recurring][interval]": "month",
         "line_items[0][quantity]": "1",
-        "success_url": `${params.callbackUrl}?session_id={CHECKOUT_SESSION_ID}`,
-        "cancel_url": `${params.callbackUrl}?canceled=true`,
+        "success_url": `${appUrl}/dashboard/billing?success=payment_completed`,
+        "cancel_url": `${appUrl}/dashboard/billing?canceled=true`,
         "client_reference_id": ref,
         "metadata[reference]": ref,
       })
