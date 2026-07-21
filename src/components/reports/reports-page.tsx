@@ -8,53 +8,24 @@ import {
   Package,
   Users,
   UserCircle,
-  ShoppingCart,
-  Building2,
-  Banknote,
 } from "lucide-react"
-import { Loader2 } from "lucide-react"
-
-const OverviewTab = React.lazy(() =>
-  import("./overview-tab").then((m) => ({ default: m.OverviewTab }))
-)
-const SalesTab = React.lazy(() =>
-  import("./sales-tab").then((m) => ({ default: m.SalesTab }))
-)
-const InventoryTab = React.lazy(() =>
-  import("./inventory-tab").then((m) => ({ default: m.InventoryTab }))
-)
-const CustomersTab = React.lazy(() =>
-  import("./customers-tab").then((m) => ({ default: m.CustomersTab }))
-)
-const CashiersTab = React.lazy(() =>
-  import("./cashiers-tab").then((m) => ({ default: m.CashiersTab }))
-)
-const PurchasesTab = React.lazy(() =>
-  import("./purchases-tab").then((m) => ({ default: m.PurchasesTab }))
-)
-const SuppliersTab = React.lazy(() =>
-  import("./suppliers-tab").then((m) => ({ default: m.SuppliersTab }))
-)
-const CreditTab = React.lazy(() =>
-  import("./credit-tab").then((m) => ({ default: m.CreditTab }))
-)
+import { OverviewTab } from "./overview-tab"
+import { SalesTab } from "./sales-tab"
+import { InventoryTab } from "./inventory-tab"
+import { CustomersTab } from "./customers-tab"
+import { CashiersTab } from "./cashiers-tab"
 
 const TABS = [
-  { id: "overview", label: "overview", icon: BarChart3, Component: OverviewTab },
-  { id: "sales", label: "sales", icon: TrendingUp, Component: SalesTab },
-  { id: "inventory", label: "inventory", icon: Package, Component: InventoryTab },
-  { id: "purchases", label: "purchases", icon: ShoppingCart, Component: PurchasesTab },
-  { id: "suppliers", label: "suppliers", icon: Building2, Component: SuppliersTab },
-  { id: "customers", label: "customers", icon: Users, Component: CustomersTab },
-  { id: "cashiers", label: "cashiers", icon: UserCircle, Component: CashiersTab },
-  { id: "credit", label: "credit", icon: Banknote, Component: CreditTab },
+  { id: "overview", label: "overview", icon: BarChart3 },
+  { id: "sales", label: "sales", icon: TrendingUp },
+  { id: "inventory", label: "inventory", icon: Package },
+  { id: "customers", label: "customers", icon: Users },
+  { id: "cashiers", label: "cashiers", icon: UserCircle },
 ] as const
 
 export function ReportsPage() {
   const t = useTranslations("reports")
   const [activeTab, setActiveTab] = React.useState("overview")
-
-  const ActiveComponent = TABS.find((tab) => tab.id === activeTab)?.Component
 
   return (
     <div className="space-y-6">
@@ -78,15 +49,11 @@ export function ReportsPage() {
         })}
       </div>
 
-      <React.Suspense
-        fallback={
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        }
-      >
-        {ActiveComponent && <ActiveComponent />}
-      </React.Suspense>
+      {activeTab === "overview" && <OverviewTab />}
+      {activeTab === "sales" && <SalesTab />}
+      {activeTab === "inventory" && <InventoryTab />}
+      {activeTab === "customers" && <CustomersTab />}
+      {activeTab === "cashiers" && <CashiersTab />}
     </div>
   )
 }

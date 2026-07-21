@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore, noStoreResponse } from "@/lib/store"
+import { getCurrentStore } from "@/lib/store"
 import { logger } from "@/lib/logger"
-import { requireRole } from "@/lib/role"
 
 export async function GET() {
   try {
-    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
-    if (auth instanceof NextResponse) return auth
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
+
     const products = await prisma.product.findMany({
       where: { storeId: store.id },
       select: {

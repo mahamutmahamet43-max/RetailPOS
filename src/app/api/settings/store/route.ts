@@ -1,35 +1,22 @@
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { requireRole } from "@/lib/role"
-import { z } from "zod"
-import { validateOrError } from "@/lib/api-validation"
-
-const storeSettingsSchema = z.object({
-  name: z.string().min(1, "Store name is required").optional(),
-  description: z.string().optional().nullable(),
-  address: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email("Invalid email").optional().nullable().or(z.literal("")),
-  currency: z.string().optional(),
-  timezone: z.string().optional(),
-  dateFormat: z.string().optional(),
-  logoUrl: z.string().optional().nullable(),
-  lowStockAlert: z.boolean().optional(),
-  salesNotification: z.boolean().optional(),
-  emailNotification: z.boolean().optional(),
-  twoFactorEnabled: z.boolean().optional(),
-})
+import { getCurrentStore } from "@/lib/store"
 
 export async function GET() {
   try {
-    const authResult = await requireRole("OWNER")
-    if (authResult instanceof NextResponse) return authResult
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-    const store = await prisma.store.findFirst({
-      where: { ownerId: authResult.userId },
+    const store = await getCurrentStore()
+
+    const storeData = await prisma.store.findUnique({
+      where: { id: store.id },
       select: {
-        id: true,
         name: true,
         description: true,
         settings: {
@@ -50,15 +37,14 @@ export async function GET() {
       },
     })
 
-    if (!store) {
+    if (!storeData) {
       return NextResponse.json({ error: "No store found" }, { status: 404 })
     }
 
     return NextResponse.json({
-      id: store.id,
-      name: store.name,
-      description: store.description,
-      settings: store.settings || {},
+      name: storeData.name,
+      description: storeData.description,
+      settings: storeData.settings || {},
     })
   } catch (error) {
     logger.error("GET /api/settings/store error", error instanceof Error ? error : undefined)
@@ -72,32 +58,13 @@ export async function PUT(request: Request) {
     if (authResult instanceof NextResponse) return authResult
 
     const body = await request.json()
-    const validation = validateOrError(storeSettingsSchema, body)
-    if (!validation.success) return validation.response
-    const validBody = validation.data
 
-    let store = await prisma.store.findFirst({
-      where: { ownerId: authResult.userId },
-    })
+    const store = await getCurrentStore()
 
-    if (!store) {
-      const slug = (validBody.name || "store")
-        .toLowerCase().replace(/[^a-z0-9]/g, "-")
-        .replace(/-+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now()
-
-      store = await prisma.store.create({
-        data: {
-          name: validBody.name || "My Store",
-          slug,
-          ownerId: authResult.userId,
-        },
-      })
-    }
-
-    if (validBody.name) {
+    if (body.name) {
       await prisma.store.update({
         where: { id: store.id },
-        data: { name: validBody.name },
+        data: { name: body.name },
       })
     }
 
@@ -106,11 +73,10 @@ export async function PUT(request: Request) {
 
     const settingsData: Record<string, unknown> = {}
     for (const field of stringFields) {
-      const val = validBody[field as keyof typeof validBody]
-      if (val !== undefined) settingsData[field] = val === null ? null : String(val)
+      if (body[field] !== undefined) settingsData[field] = String(body[field])
     }
     for (const field of boolFields) {
-      if (validBody[field as keyof typeof validBody] !== undefined) settingsData[field] = Boolean(validBody[field as keyof typeof validBody])
+      if (body[field] !== undefined) settingsData[field] = Boolean(body[field])
     }
 
     if (Object.keys(settingsData).length > 0) {
@@ -124,7 +90,6 @@ export async function PUT(request: Request) {
     const updated = await prisma.store.findUnique({
       where: { id: store.id },
       select: {
-        id: true,
         name: true,
         description: true,
         settings: {
@@ -146,7 +111,6 @@ export async function PUT(request: Request) {
     })
 
     return NextResponse.json({
-      id: updated?.id,
       name: updated?.name,
       description: updated?.description,
       settings: updated?.settings || {},

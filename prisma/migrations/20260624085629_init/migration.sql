@@ -1,32 +1,32 @@
 -- CreateEnum
-DO $$ BEGIN CREATE TYPE "SubscriptionPlan" AS ENUM ('FREE', 'BASIC', 'PRO', 'ENTERPRISE'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE TYPE "SubscriptionPlan" AS ENUM ('FREE', 'BASIC', 'PRO', 'ENTERPRISE');
 
 -- CreateEnum
-DO $$ BEGIN CREATE TYPE "SubscriptionStatus" AS ENUM ('TRIAL', 'ACTIVE', 'INACTIVE', 'CANCELLED', 'EXPIRED', 'SUSPENDED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE TYPE "SubscriptionStatus" AS ENUM ('TRIAL', 'ACTIVE', 'INACTIVE', 'CANCELLED', 'EXPIRED', 'SUSPENDED');
 
 -- CreateEnum
-DO $$ BEGIN CREATE TYPE "BillingCycle" AS ENUM ('MONTHLY', 'YEARLY'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE TYPE "BillingCycle" AS ENUM ('MONTHLY', 'YEARLY');
 
 -- CreateEnum
-DO $$ BEGIN CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED');
 
 -- CreateEnum
-DO $$ BEGIN CREATE TYPE "BillingProvider" AS ENUM ('ZAAD', 'EVC_PLUS', 'SAHAL', 'STRIPE'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE TYPE "BillingProvider" AS ENUM ('ZAAD', 'EVC_PLUS', 'SAHAL', 'STRIPE');
 
 -- CreateEnum
-DO $$ BEGIN CREATE TYPE "UserRole" AS ENUM ('OWNER', 'MANAGER', 'CASHIER'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE TYPE "UserRole" AS ENUM ('OWNER', 'MANAGER', 'CASHIER');
 
 -- CreateEnum
-DO $$ BEGIN CREATE TYPE "TransactionType" AS ENUM ('IN', 'OUT', 'ADJUSTMENT'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE TYPE "TransactionType" AS ENUM ('IN', 'OUT', 'ADJUSTMENT');
 
 -- CreateEnum
-DO $$ BEGIN CREATE TYPE "PaymentMethod" AS ENUM ('CASH', 'ZAAD', 'EVC_PLUS', 'SAHAL', 'CARD'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE TYPE "PaymentMethod" AS ENUM ('CASH', 'ZAAD', 'EVC_PLUS', 'SAHAL', 'CARD');
 
 -- CreateEnum
-DO $$ BEGIN CREATE TYPE "SaleStatus" AS ENUM ('COMPLETED', 'VOID'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE TYPE "SaleStatus" AS ENUM ('COMPLETED', 'VOID');
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "User" (
+CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "name" TEXT,
     "email" TEXT NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS "User" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "Store" (
+CREATE TABLE "Store" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS "Store" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "Subscription" (
+CREATE TABLE "Subscription" (
     "id" TEXT NOT NULL,
     "plan" "SubscriptionPlan" NOT NULL DEFAULT 'FREE',
     "status" "SubscriptionStatus" NOT NULL DEFAULT 'TRIAL',
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS "Subscription" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "Payment" (
+CREATE TABLE "Payment" (
     "id" TEXT NOT NULL,
     "amount" DOUBLE PRECISION NOT NULL,
     "currency" TEXT NOT NULL DEFAULT 'USD',
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS "Payment" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "Category" (
+CREATE TABLE "Category" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS "Category" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "Product" (
+CREATE TABLE "Product" (
     "id" TEXT NOT NULL,
     "barcode" TEXT,
     "sku" TEXT,
@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS "Product" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "Customer" (
+CREATE TABLE "Customer" (
     "id" TEXT NOT NULL,
     "customerCode" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS "Customer" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "InventoryTransaction" (
+CREATE TABLE "InventoryTransaction" (
     "id" TEXT NOT NULL,
     "transactionType" "TransactionType" NOT NULL,
     "quantity" INTEGER NOT NULL,
@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS "InventoryTransaction" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "Sale" (
+CREATE TABLE "Sale" (
     "id" TEXT NOT NULL,
     "saleNumber" TEXT NOT NULL,
     "subtotal" DOUBLE PRECISION NOT NULL,
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS "Sale" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "SaleItem" (
+CREATE TABLE "SaleItem" (
     "id" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "productName" TEXT NOT NULL,
@@ -200,7 +200,7 @@ CREATE TABLE IF NOT EXISTS "SaleItem" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "Account" (
+CREATE TABLE "Account" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -218,7 +218,7 @@ CREATE TABLE IF NOT EXISTS "Account" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "Session" (
+CREATE TABLE "Session" (
     "id" TEXT NOT NULL,
     "sessionToken" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -228,133 +228,131 @@ CREATE TABLE IF NOT EXISTS "Session" (
 );
 
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "VerificationToken" (
+CREATE TABLE "VerificationToken" (
     "identifier" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "expires" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "Store_slug_key" ON "Store"("slug");
+CREATE UNIQUE INDEX "Store_slug_key" ON "Store"("slug");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "Subscription_storeId_key" ON "Subscription"("storeId");
+CREATE UNIQUE INDEX "Subscription_storeId_key" ON "Subscription"("storeId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "Category_storeId_name_key" ON "Category"("storeId", "name");
+CREATE UNIQUE INDEX "Category_storeId_name_key" ON "Category"("storeId", "name");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "Product_categoryId_idx" ON "Product"("categoryId");
+CREATE INDEX "Product_categoryId_idx" ON "Product"("categoryId");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "Product_storeId_isActive_idx" ON "Product"("storeId", "isActive");
+CREATE INDEX "Product_storeId_isActive_idx" ON "Product"("storeId", "isActive");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "Product_storeId_name_idx" ON "Product"("storeId", "name");
+CREATE INDEX "Product_storeId_name_idx" ON "Product"("storeId", "name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "Product_storeId_barcode_key" ON "Product"("storeId", "barcode");
+CREATE UNIQUE INDEX "Product_storeId_barcode_key" ON "Product"("storeId", "barcode");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "Customer_storeId_isActive_idx" ON "Customer"("storeId", "isActive");
+CREATE INDEX "Customer_storeId_isActive_idx" ON "Customer"("storeId", "isActive");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "Customer_storeId_createdAt_idx" ON "Customer"("storeId", "createdAt");
+CREATE INDEX "Customer_storeId_createdAt_idx" ON "Customer"("storeId", "createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "Customer_storeId_customerCode_key" ON "Customer"("storeId", "customerCode");
+CREATE UNIQUE INDEX "Customer_storeId_customerCode_key" ON "Customer"("storeId", "customerCode");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "Customer_storeId_phone_key" ON "Customer"("storeId", "phone");
+CREATE UNIQUE INDEX "Customer_storeId_phone_key" ON "Customer"("storeId", "phone");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "InventoryTransaction_storeId_createdAt_idx" ON "InventoryTransaction"("storeId", "createdAt");
+CREATE INDEX "InventoryTransaction_storeId_createdAt_idx" ON "InventoryTransaction"("storeId", "createdAt");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "InventoryTransaction_productId_idx" ON "InventoryTransaction"("productId");
+CREATE INDEX "InventoryTransaction_productId_idx" ON "InventoryTransaction"("productId");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "Sale_storeId_createdAt_idx" ON "Sale"("storeId", "createdAt");
+CREATE INDEX "Sale_storeId_createdAt_idx" ON "Sale"("storeId", "createdAt");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "Sale_storeId_cashierId_idx" ON "Sale"("storeId", "cashierId");
+CREATE INDEX "Sale_storeId_cashierId_idx" ON "Sale"("storeId", "cashierId");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "Sale_storeId_status_idx" ON "Sale"("storeId", "status");
+CREATE INDEX "Sale_storeId_status_idx" ON "Sale"("storeId", "status");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "Sale_storeId_paymentMethod_idx" ON "Sale"("storeId", "paymentMethod");
+CREATE INDEX "Sale_storeId_paymentMethod_idx" ON "Sale"("storeId", "paymentMethod");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "Sale_storeId_saleNumber_key" ON "Sale"("storeId", "saleNumber");
+CREATE UNIQUE INDEX "Sale_storeId_saleNumber_key" ON "Sale"("storeId", "saleNumber");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "SaleItem_saleId_idx" ON "SaleItem"("saleId");
+CREATE INDEX "SaleItem_saleId_idx" ON "SaleItem"("saleId");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "SaleItem_productId_idx" ON "SaleItem"("productId");
+CREATE INDEX "SaleItem_productId_idx" ON "SaleItem"("productId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "Account_provider_providerAccountId_key" ON "Account"("provider", "providerAccountId");
+CREATE UNIQUE INDEX "Account_provider_providerAccountId_key" ON "Account"("provider", "providerAccountId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "Session_sessionToken_key" ON "Session"("sessionToken");
+CREATE UNIQUE INDEX "Session_sessionToken_key" ON "Session"("sessionToken");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "VerificationToken_token_key" ON "VerificationToken"("token");
+CREATE UNIQUE INDEX "VerificationToken_token_key" ON "VerificationToken"("token");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "VerificationToken_identifier_token_key" ON "VerificationToken"("identifier", "token");
+CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationToken"("identifier", "token");
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Store" ADD CONSTRAINT "Store_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Store" ADD CONSTRAINT "Store_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Subscription" ADD CONSTRAINT "Subscription_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Subscription" ADD CONSTRAINT "Subscription_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Payment" ADD CONSTRAINT "Payment_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "Subscription"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Payment" ADD CONSTRAINT "Payment_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "Subscription"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Category" ADD CONSTRAINT "Category_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Category" ADD CONSTRAINT "Category_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Product" ADD CONSTRAINT "Product_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Product" ADD CONSTRAINT "Product_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Product" ADD CONSTRAINT "Product_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Product" ADD CONSTRAINT "Product_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Customer" ADD CONSTRAINT "Customer_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Customer" ADD CONSTRAINT "Customer_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "InventoryTransaction" ADD CONSTRAINT "InventoryTransaction_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "InventoryTransaction" ADD CONSTRAINT "InventoryTransaction_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "InventoryTransaction" ADD CONSTRAINT "InventoryTransaction_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "InventoryTransaction" ADD CONSTRAINT "InventoryTransaction_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "InventoryTransaction" ADD CONSTRAINT "InventoryTransaction_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "InventoryTransaction" ADD CONSTRAINT "InventoryTransaction_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Sale" ADD CONSTRAINT "Sale_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Sale" ADD CONSTRAINT "Sale_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Sale" ADD CONSTRAINT "Sale_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Sale" ADD CONSTRAINT "Sale_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Sale" ADD CONSTRAINT "Sale_cashierId_fkey" FOREIGN KEY ("cashierId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Sale" ADD CONSTRAINT "Sale_cashierId_fkey" FOREIGN KEY ("cashierId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "SaleItem" ADD CONSTRAINT "SaleItem_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "Sale"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "SaleItem" ADD CONSTRAINT "SaleItem_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "Sale"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
+ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-DO $$ BEGIN ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN null; END $$;
-
-
+ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

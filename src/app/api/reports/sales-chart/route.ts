@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore, noStoreResponse } from "@/lib/store"
+import { getCurrentStore } from "@/lib/store"
 import { requireRole } from "@/lib/role"
 import { logger } from "@/lib/logger"
 
@@ -10,8 +10,7 @@ export async function GET() {
     if (auth instanceof NextResponse) return auth
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
-const now = new Date()
+    const now = new Date()
 
     const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29)
     const thirtyDaysStart = new Date(thirtyDaysAgo.getFullYear(), thirtyDaysAgo.getMonth(), thirtyDaysAgo.getDate())
@@ -46,9 +45,6 @@ const now = new Date()
 
     return NextResponse.json({ sevenDays, thirtyDays })
   } catch (error) {
-    if (error instanceof Error && (error.message === "No store found" || error.message === "Unauthorized")) {
-      return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 404 })
-    }
     logger.error("GET /api/reports/sales-chart error", error instanceof Error ? error : undefined)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

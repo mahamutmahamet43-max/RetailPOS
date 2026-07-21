@@ -26,16 +26,6 @@ export const nonNegativeNumberSchema = z
   .number()
   .min(0, "Value must be non-negative")
 
-export const productUnitSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1, "Unit name is required"),
-  conversionFactor: z.number().positive("Conversion factor must be positive"),
-  sellingPrice: z.number().min(0, "Selling price must be non-negative").optional(),
-  barcode: z.string().optional().nullable(),
-  isBaseUnit: z.boolean().default(false),
-  isDefaultSaleUnit: z.boolean().default(false),
-})
-
 export const productSchema = z.object({
   name: z.string().min(1, "Product name is required"),
   barcode: z.string().optional().nullable(),
@@ -48,12 +38,6 @@ export const productSchema = z.object({
   description: z.string().optional().nullable(),
   imageUrl: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
-  unit: z.string().optional().nullable(),
-  brand: z.string().optional().nullable(),
-  expiryDate: z.string().optional().nullable(),
-  isPharmacyItem: z.boolean().optional().default(false),
-  requiresPrescription: z.boolean().optional().default(false),
-  units: z.array(productUnitSchema).optional(),
 })
 
 export const categorySchema = z.object({
@@ -80,27 +64,15 @@ export const saleItemSchema = z.object({
   quantity: z.number().int().positive("Quantity must be positive"),
   unitPrice: z.number().positive("Unit price must be positive"),
   discount: z.number().min(0).default(0),
-  productUnitId: z.string().optional().nullable(),
-  unitName: z.string().default("pcs"),
-  unitConversionFactor: z.number().positive().default(1),
 })
 
 export const saleSchema = z.object({
   items: z.array(saleItemSchema).min(1, "At least one item is required"),
   customerId: z.string().optional().nullable(),
-  paymentMethod: z.enum(["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD", "CREDIT"]),
+  paymentMethod: z.enum(["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD"]),
   amountPaid: z.number().min(0).default(0),
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),
-  localId: z.string().optional().nullable(),
-})
-
-export const customerPaymentSchema = z.object({
-  amount: z.number().positive("Amount must be positive"),
-  paymentMethod: z.enum(["CASH", "ZAAD", "EVC_PLUS", "SAHAL", "CARD"]),
-  reference: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  saleId: z.string().optional().nullable(),
 })
 
 export const inventorySchema = z.object({
@@ -113,13 +85,30 @@ export const inventorySchema = z.object({
 
 export const settingsProfileSchema = z.object({
   name: z.string().optional(),
-  email: z.string().email("Invalid email").optional().nullable().or(z.literal("")),
+  email: z.string().email("Invalid email").optional(),
   image: z.string().optional().nullable(),
 })
 
 export const settingsPasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().min(8, "New password must be at least 8 characters"),
+})
+
+export const billingSubscribeSchema = z.object({
+  plan: z.enum(["FREE", "BASIC", "PRO", "ENTERPRISE"]),
+  provider: z.enum(["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]).optional(),
+  billingCycle: z.enum(["MONTHLY", "YEARLY"]).optional(),
+  paymentReference: z.string().optional(),
+  customerPhone: z.string().optional(),
+  customerEmail: z.string().email().optional().or(z.literal("")),
+})
+
+export const billingRenewSchema = z.object({
+  provider: z.enum(["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"]),
+  billingCycle: z.enum(["MONTHLY", "YEARLY"]),
+  paymentReference: z.string().optional(),
+  customerPhone: z.string().optional(),
+  customerEmail: z.string().email().optional().or(z.literal("")),
 })
 
 export const supplierSchema = z.object({
@@ -130,14 +119,22 @@ export const supplierSchema = z.object({
   notes: z.string().optional().nullable(),
 })
 
-export const purchaseItemSchema = z.object({
-  productId: z.string().min(1, "Product is required"),
+export const supplierUpdateSchema = z.object({
+  name: z.string().min(1, "Supplier name is required").optional(),
+  phone: z.string().optional().nullable(),
+  email: z.string().email("Invalid email").optional().nullable().or(z.literal("")),
+  address: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
+
+const purchaseItemSchema = z.object({
+  productId: z.string().min(1),
   productName: z.string().min(1),
+  quantity: z.number().int().positive(),
+  costPrice: z.number().min(0),
   productUnitId: z.string().optional().nullable(),
   unitName: z.string().default("pcs"),
-  unitConversionFactor: z.number().positive("Conversion factor must be positive").default(1),
-  quantity: z.number().int().positive("Quantity must be positive"),
-  costPrice: z.number().min(0, "Cost price must be non-negative"),
+  unitConversionFactor: z.number().positive().default(1),
 })
 
 export const purchaseSchema = z.object({
@@ -145,34 +142,32 @@ export const purchaseSchema = z.object({
   supplierId: z.string().optional().nullable(),
   supplierName: z.string().min(1, "Supplier name is required"),
   notes: z.string().optional().nullable(),
-  status: z.enum(["PENDING", "COMPLETED"]).default("PENDING"),
+  status: z.enum(["PENDING", "COMPLETED", "CANCELLED"]).default("PENDING"),
   items: z.array(purchaseItemSchema).min(1, "At least one item is required"),
 })
 
-export const productUpdateSchema = productSchema.partial()
-export const categoryUpdateSchema = categorySchema.partial()
-export const customerUpdateSchema = customerSchema.partial()
-export const supplierUpdateSchema = supplierSchema.partial()
-export const billingSubscribeSchema = z.object({
-  plan: z.enum(["PREMIUM"]),
-  provider: z.enum(["SAHAL", "STRIPE"]).optional(),
-  billingCycle: z.enum(["MONTHLY", "YEARLY"]).optional(),
-  paymentReference: z.string().optional(),
-  customerPhone: z.string().optional(),
-  customerEmail: z.string().email().optional().or(z.literal("")),
+export const customerPaymentSchema = z.object({
+  amount: z.number().positive("Amount must be positive"),
+  paymentMethod: z.string().min(1, "Payment method is required"),
+  reference: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  saleId: z.string().optional().nullable(),
 })
 
-export const billingRenewSchema = z.object({
-  plan: z.enum(["PREMIUM"]).optional(),
-  provider: z.enum(["SAHAL", "STRIPE"]),
-  billingCycle: z.enum(["MONTHLY", "YEARLY"]),
-  paymentReference: z.string().optional(),
-  customerPhone: z.string().optional(),
-  customerEmail: z.string().email().optional().or(z.literal("")),
-})
-
-export const saleActionSchema = z.object({
-  action: z.literal("void"),
+export const productUpdateSchema = z.object({
+  name: z.string().min(1, "Product name is required").optional(),
+  barcode: z.string().optional().nullable(),
+  sku: z.string().optional().nullable(),
+  categoryId: z.string().min(1).optional(),
+  sellingPrice: z.number().positive().optional(),
+  costPrice: z.number().min(0).optional().nullable(),
+  stockQuantity: z.number().int().min(0).optional(),
+  minimumStock: z.number().int().min(0).optional(),
+  description: z.string().optional().nullable(),
+  imageUrl: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+  brand: z.string().optional().nullable(),
+  unit: z.string().optional().nullable(),
 })
 
 export function successResponse<T>(data: T, status = 200): NextResponse {

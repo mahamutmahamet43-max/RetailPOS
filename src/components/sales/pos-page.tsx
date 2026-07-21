@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
-import { toast } from "sonner"
 import {
   Search,
   ShoppingCart,
@@ -12,8 +11,6 @@ import {
   Printer,
   X,
   User,
-  Camera,
-  WifiOff,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,24 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Receipt } from "@/components/sales/receipt"
-import { useOnlineStatus } from "@/hooks/use-online-status"
-import { addPendingSale } from "@/lib/sync-engine"
-import {
-  refreshCache,
-  getCachedProducts,
-  getCachedCustomers,
-  getCachedProductByBarcode,
-} from "@/lib/offline-service"
-
-interface ProductUnit {
-  id: string
-  name: string
-  conversionFactor: number
-  sellingPrice: number
-  isDefaultSaleUnit: boolean
-}
 
 interface CartItem {
   productId: string
@@ -67,10 +47,6 @@ interface CartItem {
   unitPrice: number
   stockQuantity: number
   discount: number
-  productUnitId: string | null
-  unitName: string
-  unitConversionFactor: number
-  units: ProductUnit[]
 }
 
 interface Customer {
@@ -85,109 +61,28 @@ interface ProductResult {
   name: string
   sku: string | null
   barcode: string | null
-  unit: string | null
-  expiryDate: string | null
   sellingPrice: number
   stockQuantity: number
-  minimumStock: number
-  units: ProductUnit[]
-}
-
-function cartKey(storeId: string) { return `retailpos-pos-cart-${storeId}` }
-function metaKey(storeId: string) { return `retailpos-pos-meta-${storeId}` }
-
-function loadCart(storeId: string): CartItem[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = localStorage.getItem(cartKey(storeId))
-    return raw ? JSON.parse(raw) : []
-  } catch { return [] }
-}
-
-function saveCart(storeId: string, cart: CartItem[]) {
-  if (typeof window === "undefined") return
-  try { localStorage.setItem(cartKey(storeId), JSON.stringify(cart)) } catch {}
-}
-
-interface PosMeta {
-  selectedCustomerId: string
-  paymentMethod: string
-  discount: string
-  tax: string
-  amountPaid: string
-}
-
-function loadMeta(storeId: string): PosMeta {
-  if (typeof window === "undefined") return { selectedCustomerId: "", paymentMethod: "SAHAL", discount: "0", tax: "0", amountPaid: "" }
-  try {
-    const raw = localStorage.getItem(metaKey(storeId))
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return { selectedCustomerId: "", paymentMethod: "SAHAL", discount: "0", tax: "0", amountPaid: "" }
-}
-
-function saveMeta(storeId: string, meta: PosMeta) {
-  if (typeof window === "undefined") return
-  try { localStorage.setItem(metaKey(storeId), JSON.stringify(meta)) } catch {}
-}
-
-/** Migrate old generic keys (shared between stores) to store-scoped keys, then remove them. */
-function migrateOldKeys(storeId: string) {
-  if (typeof window === "undefined") return
-  try {
-    const oldCart = localStorage.getItem("retailpos-pos-cart")
-    if (oldCart) {
-      if (!localStorage.getItem(cartKey(storeId))) {
-        localStorage.setItem(cartKey(storeId), oldCart)
-      }
-      localStorage.removeItem("retailpos-pos-cart")
-    }
-    const oldMeta = localStorage.getItem("retailpos-pos-meta")
-    if (oldMeta) {
-      if (!localStorage.getItem(metaKey(storeId))) {
-        localStorage.setItem(metaKey(storeId), oldMeta)
-      }
-      localStorage.removeItem("retailpos-pos-meta")
-    }
-  } catch {}
-}
-
-function clearAllPosState() {
-  if (typeof window === "undefined") return
-  try {
-    const toRemove: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith("retailpos-pos-")) toRemove.push(key)
-    }
-    toRemove.forEach(k => localStorage.removeItem(k))
-  } catch {}
 }
 
 export function PosPage() {
   const t = useTranslations("sales")
   const common = useTranslations("common")
 
-  const [storeId, setStoreId] = React.useState<string | null>(null)
   const [barcode, setBarcode] = React.useState("")
   const [searchQuery, setSearchQuery] = React.useState("")
   const [searchResults, setSearchResults] = React.useState<ProductResult[]>([])
   const [cart, setCart] = React.useState<CartItem[]>([])
   const [customers, setCustomers] = React.useState<Customer[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = React.useState("")
-  const [paymentMethod, setPaymentMethod] = React.useState("SAHAL")
+  const [paymentMethod, setPaymentMethod] = React.useState("CASH")
   const [amountPaid, setAmountPaid] = React.useState("")
   const [discount, setDiscount] = React.useState("0")
   const [tax, setTax] = React.useState("0")
   const [checkingOut, setCheckingOut] = React.useState(false)
   const [error, setError] = React.useState("")
   const [lastSale, setLastSale] = React.useState<any>(null)
-  const [customerPurchases, setCustomerPurchases] = React.useState<any[]>([])
-  const [showScanner, setShowScanner] = React.useState(false)
   const [showReceipt, setShowReceipt] = React.useState(false)
-  const [storeInfo, setStoreInfo] = React.useState({ name: "", address: "", phone: "" })
-  const [offlineDataLoaded, setOfflineDataLoaded] = React.useState(false)
-  const { isOnline, pendingCount } = useOnlineStatus()
   const barcodeRef = React.useRef<HTMLInputElement>(null)
   const searchRef = React.useRef<HTMLInputElement>(null)
 
@@ -205,194 +100,51 @@ export function PosPage() {
 
   React.useEffect(() => {
     if (barcodeRef.current) barcodeRef.current.focus()
-    fetch("/api/settings/store")
-      .then((r) => r.json())
-      .then(async (data) => {
-        if (data.name) setStoreInfo({ name: data.name, address: data.settings?.address || "", phone: data.settings?.phone || "" })
-        if (data.id) {
-          migrateOldKeys(data.id)
-          setStoreId(data.id)
-          const savedCart = loadCart(data.id)
-          if (savedCart.length > 0) setCart(savedCart)
-          const savedMeta = loadMeta(data.id)
-          setSelectedCustomerId(savedMeta.selectedCustomerId)
-          setPaymentMethod(savedMeta.paymentMethod)
-          setDiscount(savedMeta.discount)
-          setTax(savedMeta.tax)
-          setAmountPaid(savedMeta.amountPaid)
-          await refreshCache(data.id)
-        }
-      })
-      .catch(() => {})
   }, [])
 
   React.useEffect(() => {
-    if (storeId) saveCart(storeId, cart)
-  }, [storeId, cart])
-
-  React.useEffect(() => {
-    if (storeId) saveMeta(storeId, { selectedCustomerId, paymentMethod, discount, tax, amountPaid })
-  }, [storeId, selectedCustomerId, paymentMethod, discount, tax, amountPaid])
-
-  React.useEffect(() => {
-    if (isOnline) {
-      fetch("/api/customers?limit=1000")
-        .then((r) => r.json())
-        .then((data) => setCustomers(data.customers || []))
-        .catch(() => loadOfflineCustomers())
-    } else {
-      loadOfflineCustomers()
-    }
-  }, [isOnline])
-
-  async function loadOfflineCustomers() {
-    const cached = await getCachedCustomers()
-    setCustomers(cached.map((c) => ({ id: c.id, firstName: c.firstName, lastName: c.lastName, phone: c.phone })))
-    setOfflineDataLoaded(true)
-  }
-
-  React.useEffect(() => {
-    if (!selectedCustomerId) {
-      setCustomerPurchases([])
-      return
-    }
-    fetch(`/api/customers/${selectedCustomerId}`)
+    fetch("/api/customers?limit=1000")
       .then((r) => r.json())
-      .then((data) => setCustomerPurchases(data.sales || []))
-      .catch(() => setCustomerPurchases([]))
-  }, [selectedCustomerId])
-
-  React.useEffect(() => {
-    if (!showScanner) return
-    let scanner: any = null
-    let running = false
-    import("html5-qrcode").then(({ Html5Qrcode }) => {
-      scanner = new Html5Qrcode("barcode-scanner")
-      scanner.start(
-        { facingMode: "environment" },
-        { fps: 24, qrbox: { width: 500, height: 350 } },
-        (decodedText: string) => {
-          setBarcode(decodedText)
-          running = false
-          scanner.stop().catch(() => {})
-          setShowScanner(false)
-          setTimeout(() => {
-            const form = document.querySelector("form")
-            if (form) form.requestSubmit()
-          }, 100)
-        },
-        () => {}
-      ).then(() => { running = true }).catch(() => {})
-    })
-    return () => {
-      if (scanner && running) scanner.stop().catch(() => {})
-    }
-  }, [showScanner])
+      .then((data) => setCustomers(data.customers || []))
+      .catch(() => {})
+  }, [])
 
   async function handleBarcodeSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!barcode.trim()) return
-    if (isOnline) {
-      try {
-        const res = await fetch(
-          `/api/products?search=${encodeURIComponent(barcode.trim())}&limit=1`
-        )
-        if (res.ok) {
-          const data = await res.json()
-          const product = data.products?.[0]
-          if (!product) {
-            toast.error(`No product found with barcode "${barcode.trim()}"`)
-          } else if (product.stockQuantity <= 0) {
-            toast.error(`"${product.name}" is out of stock`)
-          } else {
-            addToCart(product)
-          }
-        } else {
-          toast.error("Barcode lookup failed")
+    try {
+      const res = await fetch(
+        `/api/products?search=${encodeURIComponent(barcode.trim())}&limit=1`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const product = data.products?.[0]
+        if (product && product.stockQuantity > 0) {
+          addToCart(product)
         }
-      } catch {
-        toast.error("Barcode lookup failed")
       }
-    } else {
-      const cached = await getCachedProductByBarcode(barcode.trim())
-      if (!cached) {
-        toast.error(`No product found with barcode "${barcode.trim()}"`)
-      } else if (cached.stockQuantity <= 0) {
-        toast.error(`"${cached.name}" is out of stock`)
-      } else {
-        addToCart({
-          id: cached.id,
-          name: cached.name,
-          sku: cached.sku,
-          barcode: cached.barcode,
-          unit: cached.unit,
-          expiryDate: cached.expiryDate,
-          sellingPrice: cached.sellingPrice,
-          stockQuantity: cached.stockQuantity,
-          minimumStock: cached.minimumStock,
-          units: [],
-        })
-      }
+    } catch {
+      console.error("Barcode lookup failed")
     }
     setBarcode("")
     if (barcodeRef.current) barcodeRef.current.focus()
   }
 
   React.useEffect(() => {
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       if (!searchQuery.trim()) {
         setSearchResults([])
         return
       }
-      if (isOnline) {
-        fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=10`)
-          .then((r) => r.json())
-          .then((data) => setSearchResults(data.products || []))
-          .catch(() => {})
-      } else {
-        const cached = await getCachedProducts(searchQuery)
-        setSearchResults(cached.map((p) => ({
-          id: p.id,
-          name: p.name,
-          sku: p.sku,
-          barcode: p.barcode,
-          unit: p.unit,
-          expiryDate: p.expiryDate,
-          sellingPrice: p.sellingPrice,
-          stockQuantity: p.stockQuantity,
-          minimumStock: p.minimumStock,
-          units: [],
-        })))
-      }
+      fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=10`)
+        .then((r) => r.json())
+        .then((data) => setSearchResults(data.products || []))
+        .catch(() => {})
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery, isOnline])
-
-  function getDefaultUnit(product: ProductResult): { productUnitId: string | null; unitName: string; unitConversionFactor: number; unitPrice: number } {
-    if (!product.units || product.units.length === 0) {
-      return { productUnitId: null, unitName: product.unit || "pcs", unitConversionFactor: 1, unitPrice: product.sellingPrice }
-    }
-    const defaultUnit = product.units.find((u) => u.isDefaultSaleUnit) || product.units[0]
-    return {
-      productUnitId: defaultUnit.id,
-      unitName: defaultUnit.name,
-      unitConversionFactor: defaultUnit.conversionFactor,
-      unitPrice: Number(defaultUnit.sellingPrice) || product.sellingPrice,
-    }
-  }
+  }, [searchQuery])
 
   function addToCart(product: ProductResult) {
-    if (product.expiryDate) {
-      const expired = new Date(product.expiryDate) < new Date(new Date().toDateString())
-      if (expired) {
-        toast.error(`"${product.name}" expired on ${new Date(product.expiryDate).toLocaleDateString()}. Cannot add to cart.`)
-        return
-      }
-    }
-    if (product.minimumStock > 0 && product.stockQuantity <= product.minimumStock) {
-      toast.warning(`"${product.name}" has only ${product.stockQuantity} in stock (min: ${product.minimumStock})`)
-    }
-    const unitInfo = getDefaultUnit(product)
     setCart((prev) => {
       const existing = prev.find((i) => i.productId === product.id)
       if (existing) {
@@ -410,13 +162,9 @@ export function PosPage() {
           productName: product.name,
           barcode: product.barcode,
           quantity: 1,
-          unitPrice: unitInfo.unitPrice,
+          unitPrice: product.sellingPrice,
           stockQuantity: product.stockQuantity,
           discount: 0,
-          productUnitId: unitInfo.productUnitId,
-          unitName: unitInfo.unitName,
-          unitConversionFactor: unitInfo.unitConversionFactor,
-          units: product.units || [],
         },
       ]
     })
@@ -435,23 +183,6 @@ export function PosPage() {
         i.productId === productId ? { ...i, quantity: newQty } : i
       )
     })
-  }
-
-  function changeUnit(productId: string, unitId: string) {
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.productId !== productId) return item
-        const unit = item.units.find((u) => u.id === unitId)
-        if (!unit) return item
-        return {
-          ...item,
-          productUnitId: unit.id,
-          unitName: unit.name,
-          unitConversionFactor: unit.conversionFactor,
-          unitPrice: Number(unit.sellingPrice) || 0,
-        }
-      })
-    )
   }
 
   function removeItem(productId: string) {
@@ -475,65 +206,45 @@ export function PosPage() {
       setError(t("insufficientPayment"))
       return
     }
-    if (paymentMethod === "CREDIT" && !selectedCustomerId) {
-      setError("Customer is required for credit sales")
-      return
-    }
     setCheckingOut(true)
     setError("")
 
-    const localId = crypto.randomUUID()
-    const salePayload = {
-      items: cart.map((item) => ({
-        productId: item.productId,
-        productName: item.productName,
-        barcode: item.barcode,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        discount: item.discount,
-        productUnitId: item.productUnitId,
-        unitName: item.unitName,
-        unitConversionFactor: item.unitConversionFactor,
-      })),
-      customerId: selectedCustomerId || null,
-      paymentMethod,
-      amountPaid: paymentMethod === "CASH" ? parseFloat(amountPaid) : (paymentMethod === "CREDIT" ? (parseFloat(amountPaid) || 0) : grandTotal),
-      discount: saleDiscount,
-      tax: saleTax,
-      localId,
-    }
+    try {
+      const res = await fetch("/api/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cart.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            barcode: item.barcode,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount,
+          })),
+          customerId: selectedCustomerId || null,
+          paymentMethod,
+          amountPaid: paymentMethod === "CASH" ? parseFloat(amountPaid) : grandTotal,
+          discount: saleDiscount,
+          tax: saleTax,
+        }),
+      })
 
-    await addPendingSale(localId, salePayload)
-
-    if (isOnline) {
-      try {
-        const res = await fetch("/api/sales", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(salePayload),
-        })
-
-        if (!res.ok) {
-          const data = await res.json()
-          setError(data.error || common("error"))
-          setCheckingOut(false)
-          return
-        }
-
-        const sale = await res.json()
-        setLastSale(sale)
-        clearCart()
-        setShowReceipt(true)
-        setCheckingOut(false)
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error || common("error"))
         return
-      } catch {
-        // Network failed during API call - sale is safely saved in IndexedDB
       }
-    }
 
-    toast.success("Sale saved offline. It will sync when connected.")
-    clearCart()
-    setCheckingOut(false)
+      const sale = await res.json()
+      setLastSale(sale)
+      clearCart()
+      setShowReceipt(true)
+    } catch {
+      setError(common("error"))
+    } finally {
+      setCheckingOut(false)
+    }
   }
 
   function handlePrintReceipt() {
@@ -541,6 +252,12 @@ export function PosPage() {
     setTimeout(() => {
       window.print()
     }, 100)
+  }
+
+  const storeInfo = {
+    name: "RetailPOS",
+    address: "",
+    phone: "",
   }
 
   return (
@@ -558,9 +275,6 @@ export function PosPage() {
                 className="pl-8 h-11 lg:h-9"
               />
             </div>
-            <Button type="button" variant="outline" size="icon" className="shrink-0 h-11 lg:h-9 w-11 lg:w-9" onClick={() => setShowScanner(true)}>
-              <Camera className="h-4 w-4" />
-            </Button>
           </form>
 
           <div className="relative">
@@ -582,20 +296,16 @@ export function PosPage() {
                       onClick={() => addToCart(product)}
                       className="w-full flex items-center justify-between px-3 py-3 lg:py-2 text-sm hover:bg-accent rounded-sm text-left min-h-11"
                     >
-                      <div className="min-w-0 flex-1">
+                      <div>
                         <span className="font-medium">{product.name}</span>
-                        {product.expiryDate && new Date(product.expiryDate) < new Date(new Date().toDateString()) && (
-                          <span className="ml-2 text-xs text-destructive font-semibold">{t("expired")}</span>
-                        )}
-                        {product.minimumStock > 0 && product.stockQuantity <= product.minimumStock && (
-                          <span className="ml-2 text-xs text-amber-600 font-semibold">{t("lowStock")}</span>
-                        )}
                         {product.barcode && (
-                          <span className="ml-2 text-xs text-muted-foreground font-mono">{product.barcode}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {product.barcode}
+                          </span>
                         )}
                       </div>
-                      <div className="text-right text-xs text-muted-foreground shrink-0 ml-2">
-                        <div>{t("currencySymbol")}{product.sellingPrice.toFixed(2)}</div>
+                      <div className="text-right text-xs text-muted-foreground">
+                        <div>${product.sellingPrice.toFixed(2)}</div>
                         <div>
                           {t("stock")}: {product.stockQuantity}
                         </div>
@@ -611,12 +321,11 @@ export function PosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[30%]">{t("product")}</TableHead>
-                  <TableHead className="w-[12%] hidden sm:table-cell">{t("unit")}</TableHead>
-                  <TableHead className="text-right w-[13%]">{t("qty")}</TableHead>
-                  <TableHead className="text-right w-[13%] hidden sm:table-cell">{t("price")}</TableHead>
-                  <TableHead className="text-right w-[13%] hidden sm:table-cell">{t("discount")}</TableHead>
-                  <TableHead className="text-right w-[13%]">{t("total")}</TableHead>
+                  <TableHead className="w-[40%]">{t("product")}</TableHead>
+                  <TableHead className="text-right w-[15%]">{t("qty")}</TableHead>
+                  <TableHead className="text-right w-[15%] hidden sm:table-cell">{t("price")}</TableHead>
+                  <TableHead className="text-right w-[15%] hidden sm:table-cell">{t("discount")}</TableHead>
+                  <TableHead className="text-right w-[15%]">{t("total")}</TableHead>
                   <TableHead className="w-[40px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -634,25 +343,8 @@ export function PosPage() {
                 ) : (
                   cart.map((item) => (
                     <TableRow key={item.productId}>
-                      <TableCell className="font-medium truncate max-w-[160px]">
+                      <TableCell className="font-medium truncate max-w-[200px]">
                         {item.productName}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        {item.units.length > 0 ? (
-                          <select
-                            value={item.productUnitId || ""}
-                            onChange={(e) => changeUnit(item.productId, e.target.value)}
-                            className="h-9 text-xs rounded-md border border-input bg-transparent px-2"
-                          >
-                            {item.units.map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{item.unitName}</span>
-                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -692,7 +384,7 @@ export function PosPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono hidden sm:table-cell">
-                        {t("currencySymbol")}{item.unitPrice.toFixed(2)}
+                        ${item.unitPrice.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right hidden sm:table-cell">
                         <Input
@@ -713,7 +405,7 @@ export function PosPage() {
                         />
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
-                        {t("currencySymbol")}
+                        $
                         {(
                           item.unitPrice * item.quantity -
                           item.discount
@@ -761,22 +453,22 @@ export function PosPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("subtotal")}</span>
-                <span className="font-mono">{t("currencySymbol")}{subtotal.toFixed(2)}</span>
+                <span className="font-mono">${subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("discount")}</span>
                 <span className="font-mono text-destructive">
-                  -{t("currencySymbol")}{totalDiscount.toFixed(2)}
+                  -${totalDiscount.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("tax")}</span>
-                <span className="font-mono">{t("currencySymbol")}{saleTax.toFixed(2)}</span>
+                <span className="font-mono">${saleTax.toFixed(2)}</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg font-bold">
                 <span>{t("grandTotal")}</span>
-                <span className="font-mono">{t("currencySymbol")}{grandTotal.toFixed(2)}</span>
+                <span className="font-mono">${grandTotal.toFixed(2)}</span>
               </div>
             </CardContent>
           </Card>
@@ -799,17 +491,6 @@ export function PosPage() {
                 ))}
               </SelectContent>
             </Select>
-            {customerPurchases.length > 0 && (
-              <div className="mt-1 text-xs text-muted-foreground max-h-24 overflow-y-auto space-y-1 border rounded p-2">
-                <p className="font-medium text-foreground">{t("recentPurchases")}</p>
-                {customerPurchases.slice(0, 5).map((s: any) => (
-                  <div key={s.id} className="flex justify-between">
-                    <span>{s.saleNumber}</span>
-                    <span>{t("currencySymbol")}{s.total.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           <div className="space-y-2">
@@ -843,23 +524,14 @@ export function PosPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="SAHAL">Sahal</SelectItem>
+                <SelectItem value="CASH">{t("cash")}</SelectItem>
                 <SelectItem value="ZAAD">ZAAD</SelectItem>
                 <SelectItem value="EVC_PLUS">EVC Plus</SelectItem>
-                <SelectItem value="CASH">{t("cash")}</SelectItem>
+                <SelectItem value="SAHAL">Sahal</SelectItem>
                 <SelectItem value="CARD">{t("card")}</SelectItem>
-                <SelectItem value="CREDIT">{t("credit")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
-
-          {paymentMethod === "CREDIT" && (
-            <div className="space-y-2">
-              <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-200">
-                {t("creditWarning")}
-              </div>
-            </div>
-          )}
 
           {paymentMethod === "CASH" && (
             <div className="space-y-2">
@@ -875,16 +547,9 @@ export function PosPage() {
               />
               {parseFloat(amountPaid) > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  {t("change")}: {t("currencySymbol")}{changeGiven.toFixed(2)}
+                  {t("change")}: ${changeGiven.toFixed(2)}
                 </p>
               )}
-            </div>
-          )}
-
-          {!isOnline && (
-            <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-              <WifiOff className="h-4 w-4" />
-              <span>Offline — {pendingCount} pending sync</span>
             </div>
           )}
 
@@ -919,15 +584,6 @@ export function PosPage() {
           />
         </div>
       )}
-
-      <Dialog open={showScanner} onOpenChange={setShowScanner}>
-        <DialogContent className="sm:max-w-2xl w-full">
-          <DialogHeader>
-            <DialogTitle>{t("scanBarcodeTitle")}</DialogTitle>
-          </DialogHeader>
-          <div id="barcode-scanner" className="w-full h-[70dvh] min-h-[350px] max-h-[600px] bg-muted rounded-lg overflow-hidden" />
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

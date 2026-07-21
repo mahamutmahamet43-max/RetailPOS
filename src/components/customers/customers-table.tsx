@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useTranslations } from "next-intl"
 import {
   Pencil,
@@ -11,7 +10,6 @@ import {
   Users as UsersIcon,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -180,13 +178,7 @@ export function CustomersTable() {
                     {customer.customerCode}
                   </TableCell>
                   <TableCell className="font-medium">
-                    <Link
-                      href={`/dashboard/customers/${customer.id}`}
-                      className="flex items-center gap-1 hover:underline text-primary"
-                    >
-                      {fullName(customer)}
-                      <ExternalLink className="h-3 w-3" />
-                    </Link>
+                    {fullName(customer)}
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-[120px] truncate">
                     {customer.companyName || "-"}

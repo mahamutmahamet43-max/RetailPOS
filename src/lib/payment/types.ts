@@ -1,6 +1,6 @@
 export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED"
 
-export type ProviderName = "SAHAL" | "STRIPE"
+export type ProviderName = "ZAAD" | "EVC_PLUS" | "SAHAL" | "STRIPE"
 
 export interface InitiatePaymentParams {
   amount: number

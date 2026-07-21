@@ -24,7 +24,6 @@ async function main() {
       email: ownerEmail,
       passwordHash,
       role: "OWNER",
-      emailVerified: new Date(),
     },
   })
 
@@ -34,6 +33,15 @@ async function main() {
       slug: "my-retail-store",
       description: "A sample retail store",
       ownerId: owner.id,
+    },
+  })
+
+  await prisma.subscription.create({
+    data: {
+      plan: "FREE",
+      status: "ACTIVE",
+      startsAt: new Date(),
+      storeId: store.id,
     },
   })
 
@@ -98,7 +106,6 @@ async function main() {
       email: "manager@retailpos.com",
       passwordHash: managerPasswordHash,
       role: "MANAGER",
-      emailVerified: new Date(),
     },
   })
 
@@ -109,16 +116,13 @@ async function main() {
       email: "cashier@retailpos.com",
       passwordHash: cashierPasswordHash,
       role: "CASHIER",
-      emailVerified: new Date(),
     },
   })
 
   console.log("Seed complete!")
-  if (process.env.NODE_ENV !== "production") {
-    console.log("  Owner:  admin@retailpos.com / password123")
-    console.log("  Manager: manager@retailpos.com / manager123")
-    console.log("  Cashier: cashier@retailpos.com / cashier123")
-  }
+  console.log("  Owner:  admin@retailpos.com / password123")
+  console.log("  Manager: manager@retailpos.com / manager123")
+  console.log("  Cashier: cashier@retailpos.com / cashier123")
 }
 
 main()

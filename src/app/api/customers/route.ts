@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore, noStoreResponse } from "@/lib/store"
+import { getCurrentStore } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { validateOrError, customerSchema } from "@/lib/api-validation"
+import { enforceLimit } from "@/lib/subscription/enforce"
 import { requireRole } from "@/lib/role"
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
-    if (auth instanceof NextResponse) return auth
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search") || ""
-    const status = searchParams.get("status") || ""
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1)
-    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "10") || 10))
+    const page = parseInt(searchParams.get("page") || "1")
+    const limit = parseInt(searchParams.get("limit") || "10")
+    const status = searchParams.get("status") || "all"
     const skip = (page - 1) * limit
 
     const where: Prisma.CustomerWhereInput = {
@@ -68,16 +71,19 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireRole("OWNER", "MANAGER")
-    if (auth instanceof NextResponse) return auth
+    const authResult = await requireRole("OWNER", "MANAGER")
+    if (authResult instanceof NextResponse) return authResult
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const body = await request.json()
     const validation = validateOrError(customerSchema, body)
     if (!validation.success) return validation.response
 
     const data = validation.data
+
+    const customerCount = await prisma.customer.count({ where: { storeId: store.id, isActive: true } })
+    const limitCheck = await enforceLimit(store.id, "customers", customerCount)
+    if (limitCheck) return limitCheck
 
     const existingPhone = await prisma.customer.findFirst({
       where: { phone: data.phone.trim(), storeId: store.id },
@@ -111,7 +117,7 @@ export async function POST(request: Request) {
         email: data.email?.trim() || null,
         address: data.address?.trim() || null,
         notes: data.notes?.trim() || null,
-        creditLimit: data.creditLimit ?? 0,
+        creditLimit: data.creditLimit,
         storeId: store.id,
       },
     })

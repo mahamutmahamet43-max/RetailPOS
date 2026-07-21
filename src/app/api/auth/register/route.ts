@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
-import crypto from "crypto"
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
-import { sendVerifyEmailEmail } from "@/lib/email/service"
+import { sendWelcomeEmail } from "@/lib/email/service"
 
 export async function POST(request: Request) {
   try {
@@ -18,10 +17,9 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { name, password } = body
-    const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : ""
+    const { name, email, password } = body
 
-    if (!email) {
+    if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
@@ -48,47 +46,55 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(password, 12)
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        passwordHash,
-        stores: {
-          create: {
-            name: `${name || email}'s Store`,
-            slug: email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now(),
+    const now = new Date()
+    const trialEnd = new Date(now.getTime() + 14 * 86400000)
+
+    const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name,
+          email,
+          passwordHash,
+        },
+      })
+
+      const store = await tx.store.create({
+        data: {
+          name: `${name || email}'s Store`,
+          slug: email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now(),
+          ownerId: newUser.id,
+          subscription: {
+            create: {
+              plan: "FREE",
+              status: "TRIAL",
+              startsAt: now,
+              trialEndsAt: trialEnd,
+              endsAt: trialEnd,
+            },
           },
         },
-      },
+      })
+
+      // Link store back to user for multi-user store access
+      await tx.user.update({
+        where: { id: newUser.id },
+        data: { storeId: store.id },
+      })
+
+      return { ...newUser, storeId: store.id }
     })
 
-    const token = crypto.randomBytes(32).toString("hex")
-    const expires = new Date(Date.now() + 86400000)
+    logger.info("User registered", { userId: user.id, email: user.email })
 
-    await prisma.verificationToken.create({
-      data: {
-        identifier: `verify:${user.email}`,
-        token,
-        expires,
-      },
-    })
-
-    const locale = "en"
-    const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/${locale}/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`
-
-    const emailResult = await sendVerifyEmailEmail(user.email, user.name || "User", verifyUrl)
-
-    logger.info("User registered", { userId: user.id, email: user.email, emailSent: emailResult.success, emailError: emailResult.error })
-
-    const message = emailResult.success
-      ? "Registration successful. Please check your email to verify your account."
-      : `Account created but verification email failed: ${emailResult.error || "unknown error"}. Please try resending.`
+    sendWelcomeEmail(user.email, name || "there", `${name || email}'s Store`).catch(() => {})
 
     return NextResponse.json(
       {
-        message,
-        email: user.email,
-        emailSent: emailResult.success,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
       },
       { status: 201 }
     )

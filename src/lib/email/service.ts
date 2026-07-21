@@ -3,6 +3,8 @@ import type { EmailTemplate, EmailProvider } from "./types"
 import { renderWelcomeHtml, renderWelcomeText } from "./templates/welcome"
 import { renderVerifyEmailHtml, renderVerifyEmailText } from "./templates/verify-email"
 import { renderPasswordResetHtml, renderPasswordResetText } from "./templates/password-reset"
+import { renderSubscriptionConfirmedHtml, renderSubscriptionConfirmedText } from "./templates/subscription-confirmed"
+import { renderPaymentReceiptHtml, renderPaymentReceiptText } from "./templates/payment-receipt"
 import { renderInvoiceHtml, renderInvoiceText } from "./templates/invoice"
 import { renderLowStockHtml, renderLowStockText } from "./templates/low-stock"
 import { renderDailySalesHtml, renderDailySalesText } from "./templates/daily-sales"
@@ -25,6 +27,10 @@ function getTemplateRenderers(templateName: EmailTemplate) {
       return { html: renderVerifyEmailHtml, text: renderVerifyEmailText }
     case "password-reset":
       return { html: renderPasswordResetHtml, text: renderPasswordResetText }
+    case "subscription-confirmed":
+      return { html: renderSubscriptionConfirmedHtml, text: renderSubscriptionConfirmedText }
+    case "payment-receipt":
+      return { html: renderPaymentReceiptHtml, text: renderPaymentReceiptText }
     case "invoice":
       return { html: renderInvoiceHtml, text: renderInvoiceText }
     case "low-stock":
@@ -43,6 +49,8 @@ function getDefaultSubject(templateName: EmailTemplate): string {
     "welcome": "Welcome to RetailPOS!",
     "verify-email": "Verify your email address",
     "password-reset": "Reset your password",
+    "subscription-confirmed": "Subscription confirmed",
+    "payment-receipt": "Payment receipt",
     "invoice": "Invoice from RetailPOS",
     "low-stock": "Low stock alert",
     "daily-sales": "Daily sales summary",
@@ -90,6 +98,49 @@ export async function sendWelcomeEmail(to: string, name: string, storeName: stri
   })
 }
 
+export async function sendSubscriptionConfirmedEmail(
+  to: string,
+  name: string,
+  plan: string,
+  amount: string,
+  nextBillingDate: string
+): Promise<{ success: boolean; error?: string }> {
+  return sendTemplateEmail({
+    to,
+    templateName: "subscription-confirmed",
+    vars: {
+      name: escapeHtml(name),
+      plan,
+      amount,
+      nextBillingDate,
+      billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/billing`,
+    },
+  })
+}
+
+export async function sendPaymentReceiptEmail(
+  to: string,
+  name: string,
+  receiptNumber: string,
+  amount: string,
+  plan: string,
+  paymentMethod: string
+): Promise<{ success: boolean; error?: string }> {
+  return sendTemplateEmail({
+    to,
+    templateName: "payment-receipt",
+    vars: {
+      name: escapeHtml(name),
+      receiptNumber,
+      amount,
+      plan,
+      paymentMethod,
+      date: new Date().toLocaleDateString(),
+      billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/billing`,
+    },
+  })
+}
+
 export async function sendLowStockEmail(
   to: string,
   name: string,
@@ -108,36 +159,6 @@ export async function sendLowStockEmail(
       currentStock,
       minimumStock,
       inventoryUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/inventory`,
-    },
-  })
-}
-
-export async function sendPasswordResetEmail(
-  to: string,
-  name: string,
-  resetUrl: string
-): Promise<{ success: boolean; error?: string }> {
-  return sendTemplateEmail({
-    to,
-    templateName: "password-reset",
-    vars: {
-      name: escapeHtml(name),
-      resetUrl,
-    },
-  })
-}
-
-export async function sendVerifyEmailEmail(
-  to: string,
-  name: string,
-  verificationUrl: string
-): Promise<{ success: boolean; error?: string }> {
-  return sendTemplateEmail({
-    to,
-    templateName: "verify-email",
-    vars: {
-      name: escapeHtml(name),
-      verificationUrl,
     },
   })
 }
@@ -181,6 +202,41 @@ export async function sendInvoiceEmail(
       dueDate: new Date(Date.now() + 30 * 86400000).toLocaleDateString(),
       storeName: escapeHtml(storeName),
       items,
+      billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/billing`,
+    },
+  })
+}
+
+export async function sendPasswordResetEmail(
+  to: string,
+  name: string,
+  resetUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  return sendTemplateEmail({
+    to,
+    templateName: "password-reset",
+    subject: "Reset your password",
+    vars: {
+      name: escapeHtml(name || "there"),
+      resetUrl,
+      expiryMinutes: 60,
+    },
+  })
+}
+
+export async function sendVerifyEmailEmail(
+  to: string,
+  name: string,
+  verifyUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  return sendTemplateEmail({
+    to,
+    templateName: "verify-email",
+    subject: "Verify your email address",
+    vars: {
+      name: escapeHtml(name || "there"),
+      verifyUrl,
+      expiryHours: 24,
     },
   })
 }

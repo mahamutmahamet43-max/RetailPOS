@@ -80,6 +80,14 @@ export const logger = {
     this.info("Inventory updated", { productId, transactionType, quantity })
   },
 
+  subscriptionChanged(storeId: string, plan: string, status: string) {
+    this.info("Subscription changed", { storeId, plan, status })
+  },
+
+  paymentProcessed(subscriptionId: string, amount: number, provider: string, status: string) {
+    this.info("Payment processed", { subscriptionId, amount, provider, status })
+  },
+
   criticalError(error: Error, context?: Record<string, unknown>) {
     this.error("Critical system error", error, context)
   },

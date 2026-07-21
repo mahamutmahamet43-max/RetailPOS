@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore, noStoreResponse } from "@/lib/store"
+import { getCurrentStore } from "@/lib/store"
+import { logger } from "@/lib/logger"
 
 export async function GET() {
   try {
@@ -11,7 +12,7 @@ export async function GET() {
     }
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
+
     const subscription = await prisma.subscription.findUnique({
       where: { storeId: store.id },
       include: {
@@ -53,7 +54,7 @@ export async function GET() {
       },
     })
   } catch (error) {
-    console.error("GET /api/billing/subscription error", error instanceof Error ? error : undefined)
+    logger.error("GET /api/billing/subscription error", error instanceof Error ? error : undefined)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

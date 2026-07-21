@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -16,14 +15,16 @@ model User {
   image                 String?
   passwordHash          String?
   role                  UserRole               @default(OWNER)
+  storeId               String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   accounts              Account[]
+  customerPayments      CustomerPayment[]
   inventoryTransactions InventoryTransaction[]
   sales                 Sale[]
-  customerPayments      CustomerPayment[]
   sessions              Session[]
-  stores                Store[]
+  ownedStores           Store[]                 @relation("StoreOwner")
+  store                 Store?                  @relation("StoreMember", fields: [storeId], references: [id], onDelete: SetNull)
 }
 
 model Store {
@@ -39,13 +40,14 @@ model Store {
   customerPayments      CustomerPayment[]
   inventoryTransactions InventoryTransaction[]
   products              Product[]
-  purchases             Purchase[]
   sales                 Sale[]
   suppliers             Supplier[]
-  owner                 User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  purchases             Purchase[]
+  backups               Backup[]
+  owner                 User                   @relation("StoreOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  users                 User[]                 @relation("StoreMember")
   subscription          Subscription?
   settings              StoreSetting?
-  backups               Backup[]
 }
 
 model Subscription {
@@ -88,23 +90,23 @@ model Payment {
 }
 
 model StoreSetting {
-  id                   String   @id @default(cuid())
-  address              String?
-  phone                String?
-  email                String?
-  currency             String   @default("USD")
-  timezone             String   @default("UTC")
-  dateFormat           String   @default("MM/DD/YYYY")
-  lowStockAlert        Boolean  @default(true)
-  salesNotification    Boolean  @default(true)
-  emailNotification    Boolean  @default(true)
-  logoUrl              String?
-  twoFactorEnabled     Boolean  @default(false)
-  enablePharmacyModule Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  storeId              String   @unique
-  store                Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  id                  String   @id @default(cuid())
+  address             String?
+  phone               String?
+  email               String?
+  currency            String   @default("USD")
+  timezone            String   @default("UTC")
+  dateFormat          String   @default("MM/DD/YYYY")
+  lowStockAlert       Boolean  @default(true)
+  salesNotification   Boolean  @default(true)
+  emailNotification   Boolean  @default(true)
+  enablePharmacyModule Boolean @default(false)
+  logoUrl             String?
+  twoFactorEnabled    Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  storeId             String   @unique
+  store               Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
 }
 
 model Category {
@@ -137,15 +139,15 @@ model Product {
   brand                 String?
   unit                  String?
   isActive              Boolean                @default(true)
-  expiryDate            DateTime?
   isPharmacyItem        Boolean                @default(false)
   requiresPrescription  Boolean                @default(false)
+  expiryDate            DateTime?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   storeId               String
   categoryId            String
   inventoryTransactions InventoryTransaction[]
-  units                 ProductUnit[]
+  productUnits          ProductUnit[]
   category              Category               @relation(fields: [categoryId], references: [id])
   store                 Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -201,36 +203,34 @@ model InventoryTransaction {
   creator         User            @relation(fields: [createdBy], references: [id])
   product         Product         @relation(fields: [productId], references: [id])
   store           Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  purchase        Purchase?       @relation(fields: [purchaseId], references: [id])
 
   @@index([storeId, createdAt])
   @@index([productId])
-  @@index([purchaseId])
 }
 
 model Sale {
-  id               String            @id @default(cuid())
-  saleNumber       String
-  subtotal         Float
-  discount         Float             @default(0)
-  tax              Float             @default(0)
-  total            Float
-  amountPaid       Float
-  changeGiven      Float             @default(0)
-  paymentMethod    PaymentMethod
-  status           SaleStatus        @default(COMPLETED)
-  creditStatus     CreditStatus?
+  id              String        @id @default(cuid())
+  saleNumber      String
+  subtotal        Float
+  discount        Float         @default(0)
+  tax             Float         @default(0)
+  total           Float
+  amountPaid      Float
+  changeGiven     Float         @default(0)
+  paymentMethod   PaymentMethod
+  status          SaleStatus    @default(COMPLETED)
+  creditStatus    CreditStatus?
   remainingBalance Float?
-  localId          String?           @unique
-  createdAt        DateTime          @default(now())
-  storeId          String
-  customerId       String?
-  cashierId        String
-  cashier          User              @relation(fields: [cashierId], references: [id])
-  customer         Customer?         @relation(fields: [customerId], references: [id])
-  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  items            SaleItem[]
-  payments         CustomerPayment[]
+  localId         String?       @unique
+  createdAt       DateTime      @default(now())
+  storeId         String
+  customerId      String?
+  cashierId       String
+  cashier         User          @relation(fields: [cashierId], references: [id])
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  store           Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items           SaleItem[]
+  customerPayments CustomerPayment[]
 
   @@unique([storeId, saleNumber])
   @@index([storeId, createdAt])
@@ -240,45 +240,24 @@ model Sale {
 }
 
 model SaleItem {
-  id                   String       @id @default(cuid())
-  productId            String
-  productName          String
-  barcode              String?
-  quantity             Int
-  unitPrice            Float
-  costPrice            Float?
-  discount             Float        @default(0)
-  total                Float
-  productUnitId        String?
-  unitName             String       @default("pcs")
-  unitConversionFactor Float        @default(1)
-  returnedQuantity     Int          @default(0)
-  saleId               String
-  sale                 Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  productUnit          ProductUnit? @relation(fields: [productUnitId], references: [id])
+  id                  String  @id @default(cuid())
+  productId           String
+  productName         String
+  barcode             String?
+  quantity            Int
+  unitPrice           Float
+  costPrice           Float?
+  discount            Float   @default(0)
+  total               Float
+  productUnitId       String?
+  returnedQuantity    Int     @default(0)
+  unitConversionFactor Float  @default(1)
+  unitName            String  @default("pcs")
+  saleId              String
+  sale                Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@index([saleId])
   @@index([productId])
-}
-
-model CustomerPayment {
-  id            String   @id @default(cuid())
-  amount        Float
-  paymentMethod String
-  reference     String?
-  notes         String?
-  createdAt     DateTime @default(now())
-  customerId    String
-  cashierId     String
-  storeId       String
-  saleId        String?
-  customer      Customer @relation(fields: [customerId], references: [id])
-  cashier       User     @relation(fields: [cashierId], references: [id])
-  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  sale          Sale?    @relation(fields: [saleId], references: [id])
-
-  @@index([customerId])
-  @@index([storeId, createdAt])
 }
 
 model Account {
@@ -315,88 +294,14 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model Supplier {
-  id        String     @id @default(cuid())
-  storeId   String
-  name      String
-  phone     String?
-  email     String?
-  address   String?
-  notes     String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  purchases Purchase[]
-
-  @@index([storeId])
-}
-
-model Purchase {
-  id            String                 @id @default(cuid())
-  invoiceNumber String
-  supplierId    String?
-  supplierName  String
-  notes         String?
-  total         Float
-  status        PurchaseStatus         @default(PENDING)
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  storeId       String
-  supplier      Supplier?              @relation(fields: [supplierId], references: [id])
-  store         Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  items         PurchaseItem[]
-  transactions  InventoryTransaction[]
-
-  @@unique([storeId, invoiceNumber])
-  @@index([storeId, createdAt])
-}
-
-model PurchaseItem {
-  id                   String       @id @default(cuid())
-  purchaseId           String
-  productId            String
-  productName          String
-  productUnitId        String?
-  unitName             String       @default("pcs")
-  unitConversionFactor Float        @default(1)
-  quantity             Int
-  costPrice            Float
-  purchase             Purchase     @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  productUnit          ProductUnit? @relation(fields: [productUnitId], references: [id])
-
-  @@index([purchaseId])
-  @@index([productId])
-  @@index([productUnitId])
-}
-
-model ProductUnit {
-  id                String         @id @default(cuid())
-  productId         String
-  name              String
-  conversionFactor  Decimal
-  sellingPrice      Decimal?
-  barcode           String?
-  isBaseUnit        Boolean        @default(false)
-  isDefaultSaleUnit Boolean        @default(false)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  product           Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  purchaseItems     PurchaseItem[]
-  saleItems         SaleItem[]
-
-  @@unique([productId, name])
-  @@unique([productId, barcode])
-  @@index([productId])
-}
-
 enum SubscriptionPlan {
   FREE
   BASIC
   PRO
-  PREMIUM
   STARTER
   PROFESSIONAL
   ENTERPRISE
+  PREMIUM
 }
 
 enum SubscriptionStatus {
@@ -448,12 +353,6 @@ enum PaymentMethod {
   CREDIT
 }
 
-enum CreditStatus {
-  PAID
-  PARTIALLY_PAID
-  UNPAID
-}
-
 enum SaleStatus {
   COMPLETED
   VOID
@@ -464,6 +363,12 @@ enum PurchaseStatus {
   PENDING
   COMPLETED
   CANCELLED
+}
+
+enum CreditStatus {
+  PAID
+  PARTIALLY_PAID
+  UNPAID
 }
 
 model EmailLog {
@@ -484,6 +389,76 @@ model EmailLog {
   @@index([createdAt])
 }
 
+model Supplier {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchases Purchase[]
+
+  @@index([storeId])
+}
+
+model Purchase {
+  id            String          @id @default(cuid())
+  invoiceNumber String
+  supplierId    String?
+  supplierName  String
+  notes         String?
+  total         Float
+  status        PurchaseStatus  @default(PENDING)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  storeId       String
+  supplier      Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  store         Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items         PurchaseItem[]
+
+  @@unique([storeId, invoiceNumber])
+  @@index([storeId, createdAt])
+}
+
+model PurchaseItem {
+  id                   String      @id @default(cuid())
+  purchaseId           String
+  productId            String
+  productName          String
+  quantity             Int
+  costPrice            Float
+  productUnitId        String?
+  unitConversionFactor Float       @default(1)
+  unitName             String      @default("pcs")
+  purchase             Purchase    @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+  @@index([productId])
+  @@index([productUnitId])
+}
+
+model ProductUnit {
+  id                 String   @id @default(cuid())
+  productId          String
+  name               String
+  conversionFactor   Decimal  @db.Decimal(65, 30)
+  sellingPrice       Decimal? @db.Decimal(65, 30)
+  barcode            String?
+  isBaseUnit         Boolean  @default(false)
+  isDefaultSaleUnit  Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, name])
+  @@unique([productId, barcode])
+  @@index([productId])
+}
+
 model Backup {
   id        String   @id @default(cuid())
   storeId   String
@@ -496,4 +471,24 @@ model Backup {
 
   @@index([storeId])
   @@index([createdAt])
+}
+
+model CustomerPayment {
+  id            String   @id @default(cuid())
+  amount        Float
+  paymentMethod String
+  reference     String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  customerId    String
+  cashierId     String
+  storeId       String
+  saleId        String?
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  cashier       User     @relation(fields: [cashierId], references: [id], onDelete: Restrict)
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sale          Sale?    @relation(fields: [saleId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([storeId, createdAt])
 }

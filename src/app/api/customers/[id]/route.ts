@@ -1,40 +1,25 @@
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore, noStoreResponse } from "@/lib/store"
+import { getCurrentStore } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { requireRole } from "@/lib/role"
-import { validateOrError, customerUpdateSchema } from "@/lib/api-validation"
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
-    if (auth instanceof NextResponse) return auth
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const { id } = await params
 
     const customer = await prisma.customer.findFirst({
       where: { id, storeId: store.id },
-      include: {
-        sales: {
-          orderBy: { createdAt: "desc" },
-          take: 20,
-          include: { items: true, cashier: { select: { name: true } } },
-        },
-        payments: {
-          orderBy: { createdAt: "desc" },
-          take: 20,
-          include: {
-            cashier: { select: { id: true, name: true } },
-            sale: { select: { saleNumber: true } },
-          },
-        },
-        _count: { select: { sales: true } },
-      },
     })
 
     if (!customer) {
@@ -59,11 +44,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireRole("OWNER", "MANAGER")
-    if (auth instanceof NextResponse) return auth
+    const authResult = await requireRole("OWNER", "MANAGER")
+    if (authResult instanceof NextResponse) return authResult
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const { id } = await params
 
     const existing = await prisma.customer.findFirst({
@@ -78,14 +62,40 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const validation = validateOrError(customerUpdateSchema, body)
-    if (!validation.success) return validation.response
-    const data = validation.data
 
-    if (data.phone !== undefined && data.phone.trim()) {
+    const {
+      firstName,
+      lastName,
+      companyName,
+      phone,
+      email,
+      address,
+      city,
+      notes,
+      creditLimit,
+      isActive,
+    } = body
+
+    if (firstName !== undefined) {
+      if (typeof firstName !== "string" || !firstName.trim()) {
+        return NextResponse.json(
+          { error: "First name is required" },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (creditLimit !== undefined && Number(creditLimit) < 0) {
+      return NextResponse.json(
+        { error: "Credit limit cannot be negative" },
+        { status: 400 }
+      )
+    }
+
+    if (phone !== undefined && phone.trim()) {
       const duplicate = await prisma.customer.findFirst({
         where: {
-          phone: data.phone.trim(),
+          phone: phone.trim(),
           storeId: store.id,
           id: { not: id },
         },
@@ -102,13 +112,16 @@ export async function PATCH(
     const customer = await prisma.customer.update({
       where: { id },
       data: {
-        ...(data.firstName !== undefined && { firstName: data.firstName.trim() }),
-        ...(data.lastName !== undefined && { lastName: data.lastName?.trim() || null }),
-        ...(data.phone !== undefined && { phone: data.phone.trim() }),
-        ...(data.email !== undefined && { email: data.email?.trim() || null }),
-        ...(data.address !== undefined && { address: data.address?.trim() || null }),
-        ...(data.notes !== undefined && { notes: data.notes?.trim() || null }),
-        ...(data.creditLimit !== undefined && { creditLimit: data.creditLimit }),
+        ...(firstName !== undefined && { firstName: firstName.trim() }),
+        ...(lastName !== undefined && { lastName: lastName?.trim() || null }),
+        ...(companyName !== undefined && { companyName: companyName?.trim() || null }),
+        ...(phone !== undefined && { phone: phone.trim() }),
+        ...(email !== undefined && { email: email?.trim() || null }),
+        ...(address !== undefined && { address: address?.trim() || null }),
+        ...(city !== undefined && { city: city?.trim() || null }),
+        ...(notes !== undefined && { notes: notes?.trim() || null }),
+        ...(creditLimit !== undefined && { creditLimit: Number(creditLimit) }),
+        ...(isActive !== undefined && { isActive }),
       },
     })
 
@@ -127,11 +140,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireRole("OWNER")
-    if (auth instanceof NextResponse) return auth
+    const authResult = await requireRole("OWNER")
+    if (authResult instanceof NextResponse) return authResult
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const { id } = await params
 
     const existing = await prisma.customer.findFirst({

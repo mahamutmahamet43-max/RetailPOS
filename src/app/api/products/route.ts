@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore, noStoreResponse } from "@/lib/store"
+import { getCurrentStore } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { validateOrError, productSchema } from "@/lib/api-validation"
+import { enforceLimit } from "@/lib/subscription/enforce"
 import { requireRole } from "@/lib/role"
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
-    if (auth instanceof NextResponse) return auth
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search") || ""
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1)
-    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "10") || 10))
+    const page = parseInt(searchParams.get("page") || "1")
+    const limit = parseInt(searchParams.get("limit") || "10")
     const skip = (page - 1) * limit
 
     const where = {
@@ -32,24 +35,16 @@ export async function GET(request: Request) {
         : {}),
     }
 
-    const rawProducts = await prisma.product.findMany({
-      where,
-      include: { category: { select: { id: true, name: true } }, units: true },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-    })
-
-    const products = rawProducts.map((p: any) => ({
-      ...p,
-      units: (p.units || []).map((u: any) => ({
-        ...u,
-        conversionFactor: Number(u.conversionFactor),
-        sellingPrice: u.sellingPrice !== null && u.sellingPrice !== undefined ? Number(u.sellingPrice) : null,
-      })),
-    }))
-
-    const total = await prisma.product.count({ where })
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        include: { category: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.product.count({ where }),
+    ])
 
     return NextResponse.json({
       products,
@@ -69,16 +64,19 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireRole("OWNER", "MANAGER")
-    if (auth instanceof NextResponse) return auth
+    const authResult = await requireRole("OWNER", "MANAGER")
+    if (authResult instanceof NextResponse) return authResult
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const body = await request.json()
     const validation = validateOrError(productSchema, body)
     if (!validation.success) return validation.response
 
     const data = validation.data
+
+    const productCount = await prisma.product.count({ where: { storeId: store.id, isActive: true } })
+    const limitCheck = await enforceLimit(store.id, "products", productCount)
+    if (limitCheck) return limitCheck
 
     const category = await prisma.category.findFirst({
       where: { id: data.categoryId, storeId: store.id },
@@ -104,8 +102,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const baseUnit = data.units?.find((u) => u.isBaseUnit)
-
     const product = await prisma.product.create({
       data: {
         barcode: data.barcode || null,
@@ -114,31 +110,14 @@ export async function POST(request: Request) {
         description: data.description || null,
         image: data.imageUrl || null,
         costPrice: data.costPrice,
-        sellingPrice: baseUnit?.sellingPrice ?? data.sellingPrice,
+        sellingPrice: data.sellingPrice,
         stockQuantity: data.stockQuantity,
         minimumStock: data.minimumStock,
-        unit: baseUnit?.name ?? data.unit ?? null,
-        brand: data.brand || null,
         isActive: data.isActive,
         storeId: store.id,
         categoryId: data.categoryId,
-        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
-        isPharmacyItem: data.isPharmacyItem ?? false,
-        requiresPrescription: data.requiresPrescription ?? false,
-        ...(data.units && {
-          units: {
-            create: data.units.map((u) => ({
-              name: u.name,
-              conversionFactor: u.conversionFactor,
-              sellingPrice: u.sellingPrice ?? 0,
-              barcode: u.barcode ?? null,
-              isBaseUnit: u.isBaseUnit,
-              isDefaultSaleUnit: u.isDefaultSaleUnit,
-            })),
-          },
-        }),
       },
-      include: { category: { select: { id: true, name: true } }, units: true },
+      include: { category: { select: { id: true, name: true } } },
     })
 
     return NextResponse.json(product, { status: 201 })

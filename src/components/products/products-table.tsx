@@ -30,16 +30,6 @@ export interface CategoryInfo {
   name: string
 }
 
-export interface ProductUnitInfo {
-  id: string
-  name: string
-  conversionFactor: number
-  sellingPrice: number
-  barcode: string | null
-  isBaseUnit: boolean
-  isDefaultSaleUnit: boolean
-}
-
 export interface Product {
   id: string
   barcode: string | null
@@ -53,14 +43,12 @@ export interface Product {
   minimumStock: number
   brand: string | null
   unit: string | null
-  expiryDate: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
   storeId: string
   categoryId: string
   category: CategoryInfo
-  units?: ProductUnitInfo[]
 }
 
 interface ProductsResponse {
@@ -190,11 +178,7 @@ export function ProductsTable() {
                   </TableCell>
                   <TableCell>{product.category.name}</TableCell>
                   <TableCell>{product.brand || "-"}</TableCell>
-                  <TableCell>
-                    {product.units && product.units.length > 0
-                      ? product.units.map((u) => u.name).join(", ")
-                      : product.unit || "-"}
-                  </TableCell>
+                  <TableCell>{product.unit || "-"}</TableCell>
                   <TableCell className="text-right">
                     {product.costPrice !== null
                       ? `$${product.costPrice.toFixed(2)}`

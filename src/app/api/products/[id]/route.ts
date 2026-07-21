@@ -1,25 +1,26 @@
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore, noStoreResponse } from "@/lib/store"
+import { getCurrentStore } from "@/lib/store"
 import { logger } from "@/lib/logger"
 import { requireRole } from "@/lib/role"
-import { validateOrError, productUpdateSchema } from "@/lib/api-validation"
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireRole("OWNER", "MANAGER", "CASHIER")
-    if (auth instanceof NextResponse) return auth
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const { id } = await params
 
-    let product = await prisma.product.findFirst({
+    const product = await prisma.product.findFirst({
       where: { id, storeId: store.id },
-      include: { category: true, units: true },
+      include: { category: true },
     })
 
     if (!product) {
@@ -29,16 +30,7 @@ export async function GET(
       )
     }
 
-    const result = {
-      ...product,
-      units: product.units.map((u) => ({
-        ...u,
-        conversionFactor: Number(u.conversionFactor),
-        sellingPrice: u.sellingPrice !== null ? Number(u.sellingPrice) : null,
-      })),
-    }
-
-    return NextResponse.json(result)
+    return NextResponse.json(product)
   } catch (error) {
     logger.error("GET /api/products/[id] error", error instanceof Error ? error : undefined)
     return NextResponse.json(
@@ -53,11 +45,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireRole("OWNER", "MANAGER")
-    if (auth instanceof NextResponse) return auth
+    const authResult = await requireRole("OWNER", "MANAGER")
+    if (authResult instanceof NextResponse) return authResult
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const { id } = await params
 
     const existing = await prisma.product.findFirst({
@@ -72,13 +63,41 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const validation = validateOrError(productUpdateSchema, body)
-    if (!validation.success) return validation.response
-    const data = validation.data
+    const {
+      barcode,
+      sku,
+      name,
+      description,
+      image,
+      costPrice,
+      sellingPrice,
+      stockQuantity,
+      minimumStock,
+      brand,
+      unit,
+      isActive,
+      categoryId,
+    } = body
 
-    if (data.categoryId) {
+    if (name !== undefined) {
+      if (typeof name !== "string" || !name.trim()) {
+        return NextResponse.json(
+          { error: "Product name is required" },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (sellingPrice !== undefined && Number(sellingPrice) <= 0) {
+      return NextResponse.json(
+        { error: "Selling price must be greater than 0" },
+        { status: 400 }
+      )
+    }
+
+    if (categoryId) {
       const category = await prisma.category.findFirst({
-        where: { id: data.categoryId, storeId: store.id },
+        where: { id: categoryId, storeId: store.id },
       })
 
       if (!category) {
@@ -89,10 +108,10 @@ export async function PATCH(
       }
     }
 
-    if (data.barcode) {
+    if (barcode) {
       const duplicate = await prisma.product.findFirst({
         where: {
-          barcode: data.barcode,
+          barcode,
           storeId: store.id,
           id: { not: id },
         },
@@ -106,73 +125,27 @@ export async function PATCH(
       }
     }
 
-    const baseUnit = data.units?.find((u) => u.isBaseUnit)
-
     const product = await prisma.product.update({
       where: { id },
       data: {
-        ...(data.name !== undefined && { name: data.name.trim() }),
-        ...(data.barcode !== undefined && { barcode: data.barcode || null }),
-        ...(data.sku !== undefined && { sku: data.sku || null }),
-        ...(data.description !== undefined && { description: data.description || null }),
-        ...(data.imageUrl !== undefined && { image: data.imageUrl || null }),
-        ...(data.costPrice !== undefined && { costPrice: data.costPrice }),
-        ...(data.sellingPrice !== undefined && { sellingPrice: baseUnit?.sellingPrice ?? data.sellingPrice }),
-        ...(data.stockQuantity !== undefined && { stockQuantity: data.stockQuantity }),
-        ...(data.minimumStock !== undefined && { minimumStock: data.minimumStock }),
-        ...(data.isActive !== undefined && { isActive: data.isActive }),
-        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
-        ...(data.unit !== undefined && { unit: baseUnit?.name ?? data.unit ?? null }),
-        ...(data.brand !== undefined && { brand: data.brand || null }),
-        ...(data.expiryDate !== undefined && { expiryDate: data.expiryDate ? new Date(data.expiryDate) : null }),
-        ...(data.isPharmacyItem !== undefined && { isPharmacyItem: data.isPharmacyItem }),
-        ...(data.requiresPrescription !== undefined && { requiresPrescription: data.requiresPrescription }),
+        ...(name !== undefined && { name: name.trim() }),
+        ...(barcode !== undefined && { barcode: barcode || null }),
+        ...(sku !== undefined && { sku: sku || null }),
+        ...(description !== undefined && { description: description || null }),
+        ...(image !== undefined && { image: image || null }),
+        ...(costPrice !== undefined && { costPrice: costPrice !== null ? Number(costPrice) : null }),
+        ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
+        ...(stockQuantity !== undefined && { stockQuantity: Number(stockQuantity) }),
+        ...(minimumStock !== undefined && { minimumStock: Number(minimumStock) }),
+        ...(brand !== undefined && { brand: brand || null }),
+        ...(unit !== undefined && { unit: unit || null }),
+        ...(isActive !== undefined && { isActive }),
+        ...(categoryId !== undefined && { categoryId }),
       },
-      include: { category: true, units: true },
+      include: { category: true },
     })
 
-    if (data.units) {
-      const incomingIds = data.units.filter((u) => u.id).map((u) => u.id!)
-      if (incomingIds.length > 0) {
-        await prisma.productUnit.deleteMany({
-          where: { productId: id, id: { notIn: incomingIds } },
-        })
-      }
-      for (const u of data.units) {
-        if (u.id) {
-          await prisma.productUnit.update({
-            where: { id: u.id },
-            data: {
-              name: u.name,
-              conversionFactor: u.conversionFactor,
-              sellingPrice: u.sellingPrice ?? 0,
-              barcode: u.barcode ?? null,
-              isBaseUnit: u.isBaseUnit,
-              isDefaultSaleUnit: u.isDefaultSaleUnit,
-            },
-          })
-        } else {
-          await prisma.productUnit.create({
-            data: {
-              productId: id,
-              name: u.name,
-              conversionFactor: u.conversionFactor,
-              sellingPrice: u.sellingPrice ?? 0,
-              barcode: u.barcode ?? null,
-              isBaseUnit: u.isBaseUnit,
-              isDefaultSaleUnit: u.isDefaultSaleUnit,
-            },
-          })
-        }
-      }
-    }
-
-    const updated = await prisma.product.findUnique({
-      where: { id },
-      include: { category: true, units: true },
-    })
-
-    return NextResponse.json(updated)
+    return NextResponse.json(product)
   } catch (error) {
     logger.error("PATCH /api/products/[id] error", error instanceof Error ? error : undefined)
     return NextResponse.json(
@@ -187,11 +160,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireRole("OWNER")
-    if (auth instanceof NextResponse) return auth
+    const authResult = await requireRole("OWNER")
+    if (authResult instanceof NextResponse) return authResult
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const { id } = await params
 
     const existing = await prisma.product.findFirst({

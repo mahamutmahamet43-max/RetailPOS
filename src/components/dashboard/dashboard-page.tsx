@@ -9,8 +9,6 @@ import {
   ShoppingCart,
   TrendingUp,
   AlertTriangle,
-  Banknote,
-  CreditCard,
 } from "lucide-react"
 import {
   Card,
@@ -19,11 +17,21 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Loader2 } from "lucide-react"
-
-const DashboardCharts = React.lazy(() =>
-  import("./dashboard-charts").then((m) => ({ default: m.DashboardCharts }))
-)
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts"
 
 interface DashboardData {
   todaySales: number
@@ -37,10 +45,6 @@ interface DashboardData {
   totalProducts: number
   lowStockProducts: number
   outOfStockProducts: number
-  outstandingCredit: number
-  customersWithDebt: number
-  todayCreditSales: number
-  recentPayments: { id: string; amount: number; paymentMethod: string; createdAt: string; customer: { firstName: string; lastName: string } | null }[]
 }
 
 interface ChartData {
@@ -56,6 +60,14 @@ interface PaymentMethods {
   methods: { method: string; total: number; count: number }[]
 }
 
+const PAYMENT_COLORS: Record<string, string> = {
+  CASH: "#22c55e",
+  ZAAD: "#3b82f6",
+  EVC_PLUS: "#a855f7",
+  SAHAL: "#f97316",
+  CARD: "#6b7280",
+}
+
 export function DashboardPage() {
   const t = useTranslations("dashboard")
   const r = useTranslations("reports")
@@ -64,21 +76,22 @@ export function DashboardPage() {
   const [chartData, setChartData] = React.useState<ChartData | null>(null)
   const [bestSelling, setBestSelling] = React.useState<BestSelling | null>(null)
   const [paymentMethods, setPaymentMethods] = React.useState<PaymentMethods | null>(null)
+
   React.useEffect(() => {
     fetch("/api/reports/dashboard")
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => r.json())
       .then(setData)
       .catch(() => {})
     fetch("/api/reports/sales-chart")
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => r.json())
       .then(setChartData)
       .catch(() => {})
     fetch("/api/reports/best-selling")
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => r.json())
       .then(setBestSelling)
       .catch(() => {})
     fetch("/api/reports/payment-methods")
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => r.json())
       .then(setPaymentMethods)
       .catch(() => {})
   }, [])
@@ -175,89 +188,110 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">{t("outstandingCredit")}</CardTitle>
-            <Banknote className="h-4 w-4 text-muted-foreground" />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="lg:col-span-4">
+          <CardHeader>
+            <CardTitle className="text-sm">{r("salesLast7Days")}</CardTitle>
           </CardHeader>
           <CardContent>
-            {data ? (
-              <div className="text-xl font-bold text-rose-600">${data.outstandingCredit.toFixed(2)}</div>
+            {chartData ? (
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData.sevenDays}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" fontSize={11} />
+                    <YAxis fontSize={11} />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="total"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
-              <Skeleton className="h-7 w-20" />
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                {r("loading")}
+              </div>
             )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">{t("customersWithDebt")}</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="text-sm">{r("paymentMethods")}</CardTitle>
           </CardHeader>
           <CardContent>
-            {data ? (
-              <div className="text-xl font-bold">{data.customersWithDebt}</div>
+            {paymentMethods && paymentMethods.methods.length > 0 ? (
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={paymentMethods.methods.map((m) => ({
+                        name: paymentLabel(m.method),
+                        value: m.total,
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {paymentMethods.methods.map((m) => (
+                        <Cell
+                          key={m.method}
+                          fill={PAYMENT_COLORS[m.method] || "#6b7280"}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend fontSize={11} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
-              <Skeleton className="h-7 w-12" />
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium">{t("todayCreditSales")}</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {data ? (
-              <div className="text-xl font-bold">${data.todayCreditSales.toFixed(2)}</div>
-            ) : (
-              <Skeleton className="h-7 w-20" />
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                {r("noData")}
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {data && data.recentPayments && data.recentPayments.length > 0 && (
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">{t("recentPayments")}</CardTitle>
+            <CardTitle className="text-sm">{r("salesLast30Days")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {data.recentPayments.map((p) => (
-                <div key={p.id} className="flex items-center justify-between text-sm">
-                  <span>
-                    {p.customer
-                      ? `${p.customer.firstName} ${p.customer.lastName || ""}`
-                      : "—"}
-                  </span>
-                  <span className="font-mono font-medium text-green-600">
-                    +${p.amount.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {chartData ? (
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData.thirtyDays}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" fontSize={10} interval={4} />
+                    <YAxis fontSize={11} />
+                    <Tooltip />
+                    <Bar dataKey="total" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                {r("loading")}
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
-
-      <React.Suspense
-        fallback={
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        }
-      >
-        <DashboardCharts
-          chartData={chartData}
-          paymentMethods={paymentMethods}
-          paymentLabel={paymentLabel}
-        />
-      </React.Suspense>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">{r("bestSellingProducts")}</CardTitle>
-        </CardHeader>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">{r("bestSellingProducts")}</CardTitle>
+          </CardHeader>
           <CardContent>
             {bestSelling && bestSelling.products.length > 0 ? (
               <div className="space-y-3">
@@ -295,6 +329,7 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+      </div>
     </div>
   )
 }

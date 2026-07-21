@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE IF NOT EXISTS "StoreSetting" (
+CREATE TABLE "StoreSetting" (
     "id" TEXT NOT NULL,
     "address" TEXT,
     "phone" TEXT,
@@ -20,10 +20,7 @@ CREATE TABLE IF NOT EXISTS "StoreSetting" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "StoreSetting_storeId_key" ON "StoreSetting"("storeId");
+CREATE UNIQUE INDEX "StoreSetting_storeId_key" ON "StoreSetting"("storeId");
 
 -- AddForeignKey
-DO $$ BEGIN
-  ALTER TABLE "StoreSetting" ADD CONSTRAINT "StoreSetting_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN null;
-END $$;
+ALTER TABLE "StoreSetting" ADD CONSTRAINT "StoreSetting_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;

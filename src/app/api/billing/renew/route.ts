@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import type { BillingProvider } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { getCurrentStore, noStoreResponse } from "@/lib/store"
+import { getCurrentStore } from "@/lib/store"
 import { requireRole } from "@/lib/role"
 import { getRawPaymentProvider, PLAN_PRICING } from "@/lib/payment-providers"
+import { logger } from "@/lib/logger"
 import { validateOrError, billingRenewSchema } from "@/lib/api-validation"
+import { sendPaymentReceiptEmail } from "@/lib/email/service"
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +15,6 @@ export async function POST(request: Request) {
     if (authResult instanceof NextResponse) return authResult
 
     const store = await getCurrentStore()
-    if (!store) return noStoreResponse()
     const body = await request.json()
     const validation = validateOrError(billingRenewSchema, body)
     if (!validation.success) return validation.response
@@ -84,8 +86,15 @@ export async function POST(request: Request) {
       },
     })
 
-    console.error(`Subscription changed: store=${store.id}, plan=${subscription.plan}, status=${updated.status}`)
-    console.error(`Payment processed: sub=${subscription.id}, amount=${amount}, provider=${provider}, status=${payment.status}`)
+    logger.subscriptionChanged(store.id, subscription.plan, updated.status)
+    logger.paymentProcessed(subscription.id, amount, provider, payment.status)
+
+    if (isComplete) {
+      const session = await auth()
+      if (session?.user?.email) {
+        sendPaymentReceiptEmail(session.user.email, session.user.name || "Valued Customer", payment.id.slice(-8).toUpperCase(), `$${amount.toFixed(2)}`, pricing.label, provider).catch(() => {})
+      }
+    }
 
     return NextResponse.json({
       subscription: updated,
@@ -98,7 +107,7 @@ export async function POST(request: Request) {
       },
     })
   } catch (error) {
-    console.error("POST /api/billing/renew error", error instanceof Error ? error : undefined)
+    logger.error("POST /api/billing/renew error", error instanceof Error ? error : undefined)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

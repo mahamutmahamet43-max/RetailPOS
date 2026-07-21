@@ -119,7 +119,7 @@ export async function getResourceCounts(storeId: string) {
     prisma.product.count({ where: { storeId, isActive: true } }),
     prisma.customer.count({ where: { storeId, isActive: true } }),
     prisma.user.count({
-      where: { stores: { some: { id: storeId } } },
+      where: { ownedStores: { some: { id: storeId } } },
     }),
     prisma.sale.aggregate({
       where: {

@@ -100,6 +100,7 @@ export default function SettingsPage() {
   const [emailNotification, setEmailNotification] = React.useState(true)
   const [logoUrl, setLogoUrl] = React.useState("")
   const [twoFactorEnabled, setTwoFactorEnabled] = React.useState(false)
+
   const [profileName, setProfileName] = React.useState("")
   const [profileEmail, setProfileEmail] = React.useState("")
   const [profileImage, setProfileImage] = React.useState("")
@@ -158,19 +159,19 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings/store", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: storeName,
-            address,
-            phone: storePhone,
-            email: storeEmail,
-            currency,
-            timezone,
-            dateFormat,
-            lowStockAlert,
-            salesNotification,
-            emailNotification,
-            logoUrl,
-          }),
+        body: JSON.stringify({
+          name: storeName,
+          address,
+          phone: storePhone,
+          email: storeEmail,
+          currency,
+          timezone,
+          dateFormat,
+          lowStockAlert,
+          salesNotification,
+          emailNotification,
+          logoUrl,
+        }),
       })
       if (res.ok) {
         setSuccessMsg(t("saved"))

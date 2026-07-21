@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getPaymentProviderByName } from "@/lib/payment/registry"
+import { logger } from "@/lib/logger"
 import crypto from "crypto"
+import { sendPaymentReceiptEmail, sendSubscriptionConfirmedEmail } from "@/lib/email/service"
 
 function isValidProvider(provider: string): boolean {
-  return ["SAHAL", "STRIPE"].includes(provider.toUpperCase())
+  return ["ZAAD", "EVC_PLUS", "SAHAL", "STRIPE"].includes(provider.toUpperCase())
 }
 
 export async function POST(
@@ -26,7 +28,7 @@ export async function POST(
     const isValid = payProvider.verifyWebhookSignature(body, signature)
 
     if (!isValid) {
-      console.warn(`Webhook signature verification failed for ${provider}`, { signature: signature.slice(0, 20) })
+      logger.warn(`Webhook signature verification failed for ${provider}`, { signature: signature.slice(0, 20) })
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
     }
 
@@ -43,7 +45,7 @@ export async function POST(
     const errorMessage = payload.error || payload.failure_message || payload.failure_reason as string | undefined
 
     if (!transactionRef) {
-      console.warn("Webhook received without transaction reference", { provider, payload })
+      logger.warn("Webhook received without transaction reference", { provider, payload })
       return NextResponse.json({ error: "Missing transaction reference" }, { status: 400 })
     }
 
@@ -52,12 +54,12 @@ export async function POST(
     })
 
     if (!payment) {
-      console.warn("Webhook for unknown payment", { provider, transactionRef })
+      logger.warn("Webhook for unknown payment", { provider, transactionRef })
       return NextResponse.json({ error: "Payment not found" }, { status: 404 })
     }
 
     if (payment.status === "COMPLETED" || payment.status === "REFUNDED") {
-      console.log("Duplicate webhook, payment already final", { paymentId: payment.id, status: payment.status })
+      logger.info("Duplicate webhook, payment already final", { paymentId: payment.id, status: payment.status })
       return NextResponse.json({ received: true, duplicate: true })
     }
 
@@ -88,11 +90,29 @@ export async function POST(
         : []),
     ])
 
-    console.error(`Payment processed: sub=${payment.subscriptionId}, amount=${payment.amount}, provider=${provider}, status=${paymentStatus}`)
+    logger.paymentProcessed(payment.subscriptionId, payment.amount, provider, paymentStatus)
+
+    if (isComplete) {
+      const sub = await prisma.subscription.findUnique({
+        where: { id: payment.subscriptionId },
+        include: { store: { select: { ownerId: true } } },
+      })
+      if (sub) {
+        const owner = await prisma.user.findUnique({
+          where: { id: sub.store.ownerId },
+          select: { email: true, name: true },
+        })
+        if (owner?.email) {
+          const dateStr = new Date(Date.now() + 30 * 86400000).toLocaleDateString()
+          sendSubscriptionConfirmedEmail(owner.email, owner.name || "Valued Customer", sub.plan, `$${payment.amount.toFixed(2)}`, dateStr).catch(() => {})
+          sendPaymentReceiptEmail(owner.email, owner.name || "Valued Customer", payment.id.slice(-8).toUpperCase(), `$${payment.amount.toFixed(2)}`, sub.plan, provider).catch(() => {})
+        }
+      }
+    }
 
     return NextResponse.json({ received: true, status: paymentStatus })
   } catch (error) {
-    console.error("Webhook processing error", error instanceof Error ? error : undefined)
+    logger.error("Webhook processing error", error instanceof Error ? error : undefined)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

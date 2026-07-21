@@ -7,10 +7,10 @@ export const authConfig: NextAuthConfig = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: 24 * 60 * 60,
   },
   jwt: {
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: 24 * 60 * 60,
   },
   cookies: {
     sessionToken: {
@@ -38,7 +38,7 @@ export const authConfig: NextAuthConfig = {
         const { default: bcrypt } = await import("bcryptjs")
         const { prisma } = await import("@/lib/prisma")
 
-        const email = (credentials.email as string).toLowerCase()
+        const email = credentials.email as string
         const password = credentials.password as string
 
         const user = await prisma.user.findUnique({
@@ -47,10 +47,6 @@ export const authConfig: NextAuthConfig = {
 
         if (!user || !user.passwordHash) {
           return null
-        }
-
-        if (!user.emailVerified) {
-          throw new Error("EmailNotVerified")
         }
 
         const isValid = await bcrypt.compare(password, user.passwordHash)
@@ -71,7 +67,7 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     async jwt({ token, user, trigger }) {
       if (user) {
-        token.id = user.id ?? ""
+        token.id = user.id
       }
 
       // Only query DB on sign-in or explicit session update (runs in Node runtime).
@@ -79,27 +75,39 @@ export const authConfig: NextAuthConfig = {
       if ((user || trigger === "update") && token.id) {
         const { prisma } = await import("@/lib/prisma")
 
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: {
-            role: true,
-            emailVerified: true,
-            stores: {
-              select: {
-                subscription: {
-                  select: { status: true, endsAt: true },
-                },
-              },
-            },
-          },
-        })
+        const [dbUser, store] = await Promise.all([
+          prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true, storeId: true },
+          }),
+          (async () => {
+            // Try user's direct store membership first (MANAGER/CASHIER)
+            const u = await prisma.user.findUnique({
+              where: { id: token.id as string },
+              select: { storeId: true },
+            })
+            if (u?.storeId) {
+              return prisma.store.findUnique({
+                where: { id: u.storeId },
+                select: { subscription: { select: { status: true, endsAt: true, trialEndsAt: true } } },
+              })
+            }
+            // Fallback: OWNER users own a store via Store.ownerId
+            return prisma.store.findFirst({
+              where: { ownerId: token.id as string },
+              select: { subscription: { select: { status: true, endsAt: true, trialEndsAt: true } } },
+            })
+          })(),
+        ])
 
         if (dbUser) {
           token.role = dbUser.role
-          token.emailVerified = !!dbUser.emailVerified
-          const sub = dbUser.stores?.[0]?.subscription
-          token.subscriptionStatus = sub?.status ?? undefined
-          token.subscriptionEndsAt = sub?.endsAt?.toISOString() ?? undefined
+        }
+
+        if (store?.subscription) {
+          const sub = store.subscription
+          token.subscriptionStatus = sub.status
+          token.subscriptionEndsAt = sub.endsAt?.toISOString() || sub.trialEndsAt?.toISOString()
         }
       }
       return token
@@ -109,9 +117,8 @@ export const authConfig: NextAuthConfig = {
         const user = session.user as unknown as Record<string, unknown>
         user.id = token.id as string
         user.role = token.role as string
-        user.emailVerified = token.emailVerified as boolean
-        user.subscriptionStatus = token.subscriptionStatus as string
-        user.subscriptionEndsAt = token.subscriptionEndsAt as string
+        user.subscriptionStatus = token.subscriptionStatus as string | undefined
+        user.subscriptionEndsAt = token.subscriptionEndsAt as string | undefined
       }
       return session
     },

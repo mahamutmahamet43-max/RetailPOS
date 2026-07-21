@@ -26,8 +26,6 @@ export default function RegisterPage() {
   const params = useParams()
   const locale = params.locale as string
 
-  const [registeredEmail, setRegisteredEmail] = React.useState("")
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsLoading(true)
@@ -45,78 +43,30 @@ export default function RegisterPage() {
         body: JSON.stringify({ name, email, password }),
       })
 
-      const data = await res.json()
-
       if (!res.ok) {
+        const data = await res.json()
         setError(data.error || t("emailInUse"))
         return
       }
 
-      if (data.emailSent === false) {
-        setError(data.message || "Account created but verification email could not be sent.")
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        setError(t("invalidCredentials"))
         return
       }
 
-      setRegisteredEmail(email)
+      router.push(`/${locale}/dashboard`)
+      router.refresh()
     } catch {
       setError("A network error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }
-  }
-
-  if (registeredEmail) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <div className="flex justify-center mb-8">
-            <Link href="/" className="flex items-center gap-2">
-              <Store className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">{app("name")}</span>
-            </Link>
-          </div>
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle>{t("verifyEmailTitle")}</CardTitle>
-              <CardDescription>
-                {t("registerVerifyPrompt") || "We sent a verification link to {email}. Please check your inbox and click the link to activate your account.".replace("{email}", registeredEmail)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {t("registerVerifyResend") || "Didn't receive the email? Check your spam folder or"}
-              </p>
-              <Button
-                variant="outline"
-                  onClick={async () => {
-                    const res = await fetch("/api/auth/verify-email/send", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ email: registeredEmail }),
-                    })
-                    const data = await res.json()
-                    if (res.ok) {
-                      alert("Verification email sent!")
-                    } else {
-                      alert(data.error || "Failed to send verification email")
-                    }
-                  }}
-              >
-                {t("verifyEmailResend") || "Resend email"}
-              </Button>
-              <p className="text-sm">
-                <Link
-                  href={`/${locale}/login`}
-                  className="underline underline-offset-4 hover:text-primary"
-                >
-                  {t("signIn")}
-                </Link>
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
   }
 
   return (

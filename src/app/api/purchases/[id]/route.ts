@@ -22,9 +22,6 @@ export async function GET(
       include: {
         items: true,
         supplier: { select: { id: true, name: true, phone: true } },
-        transactions: {
-          orderBy: { createdAt: "desc" },
-        },
       },
     })
 

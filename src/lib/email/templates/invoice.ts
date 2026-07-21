@@ -8,6 +8,7 @@ interface InvoiceVars {
   dueDate: string
   storeName: string
   items: Array<{ name: string; quantity: number; price: string; total: string }>
+  billingUrl: string
 }
 
 export function renderInvoiceHtml(vars: InvoiceVars): string {
@@ -52,6 +53,7 @@ export function renderInvoiceHtml(vars: InvoiceVars): string {
       </tfoot>
     </table>
     ${renderDivider()}
+    ${renderText(`View full invoice: ${vars.billingUrl}`)}
   `
   return renderLayout(content, `Invoice ${vars.invoiceNumber} from ${vars.storeName}`)
 }
@@ -78,7 +80,7 @@ export function renderInvoiceText(vars: InvoiceVars): string {
     "",
     `Total: ${vars.amount}`,
     "",
-
+    `View full invoice: ${vars.billingUrl}`,
     "",
     "Best,",
     "RetailPOS Team",
