@@ -36,6 +36,11 @@ async function main() {
     },
   })
 
+  await prisma.user.update({
+    where: { id: owner.id },
+    data: { storeId: store.id },
+  })
+
   await prisma.subscription.create({
     data: {
       plan: "FREE",
@@ -106,6 +111,7 @@ async function main() {
       email: "manager@retailpos.com",
       passwordHash: managerPasswordHash,
       role: "MANAGER",
+      storeId: store.id,
     },
   })
 
@@ -116,6 +122,7 @@ async function main() {
       email: "cashier@retailpos.com",
       passwordHash: cashierPasswordHash,
       role: "CASHIER",
+      storeId: store.id,
     },
   })
 
