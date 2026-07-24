@@ -57,6 +57,8 @@
     "categories": "Categories",
     "customers": "Customers",
     "sales": "Sales",
+    "purchases": "Purchases",
+    "inventory": "Inventory",
     "reports": "Reports",
     "billing": "Billing",
     "admin": "Admin",

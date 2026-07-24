@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { BarcodeLookupButton } from "@/components/products/barcode-scanner"
 import {
   Dialog,
   DialogContent,
@@ -197,12 +198,18 @@ export function ProductDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="p-barcode">{t("barcode")}</Label>
-                <Input
-                  id="p-barcode"
-                  value={barcode}
-                  onChange={(e) => setBarcode(e.target.value)}
-                  placeholder={t("barcodePlaceholder")}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="p-barcode"
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value)}
+                    placeholder={t("barcodePlaceholder")}
+                    className="flex-1"
+                  />
+                  <BarcodeLookupButton
+                    onBarcodeScanned={(scanned) => setBarcode(scanned)}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="p-sku">{t("sku")}</Label>

@@ -10,6 +10,8 @@ import {
   Tags,
   Users,
   ShoppingCart,
+  ShoppingBag,
+  Warehouse,
   BarChart3,
   Settings,
   Store,
@@ -22,6 +24,8 @@ const sidebarItems = [
   { href: "/dashboard/categories", label: "categories", icon: Tags },
   { href: "/dashboard/customers", label: "customers", icon: Users },
   { href: "/dashboard/sales", label: "sales", icon: ShoppingCart },
+  { href: "/dashboard/purchases", label: "purchases", icon: ShoppingBag },
+  { href: "/dashboard/inventory", label: "inventory", icon: Warehouse },
   { href: "/dashboard/reports", label: "reports", icon: BarChart3 },
   { href: "/dashboard/settings", label: "settings", icon: Settings },
 ] as const

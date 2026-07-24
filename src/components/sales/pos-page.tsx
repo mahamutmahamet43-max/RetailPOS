@@ -11,6 +11,7 @@ import {
   Printer,
   X,
   User,
+  Scan,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,6 +39,7 @@ import {
 } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import { Receipt } from "@/components/sales/receipt"
+import { BarcodeScanner } from "@/components/products/barcode-scanner"
 
 interface CartItem {
   productId: string
@@ -83,6 +85,7 @@ export function PosPage() {
   const [error, setError] = React.useState("")
   const [lastSale, setLastSale] = React.useState<any>(null)
   const [showReceipt, setShowReceipt] = React.useState(false)
+  const [scannerOpen, setScannerOpen] = React.useState(false)
   const barcodeRef = React.useRef<HTMLInputElement>(null)
   const searchRef = React.useRef<HTMLInputElement>(null)
 
@@ -197,6 +200,23 @@ export function PosPage() {
     setError("")
   }
 
+  async function handleBarcodeScanned(scannedBarcode: string) {
+    try {
+      const res = await fetch(
+        `/api/products?search=${encodeURIComponent(scannedBarcode)}&limit=1`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const product = data.products?.[0]
+        if (product && product.stockQuantity > 0) {
+          addToCart(product)
+        }
+      }
+    } catch {
+      console.error("Barcode lookup failed")
+    }
+  }
+
   async function handleCheckout() {
     if (cart.length === 0) {
       setError(t("emptyCart"))
@@ -272,8 +292,18 @@ export function PosPage() {
                 placeholder={t("scanBarcode")}
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
-                className="pl-8 h-11 lg:h-9"
+                className="pl-8 pr-10 h-11 lg:h-9"
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-11 w-11 lg:h-9 lg:w-9"
+                onClick={() => setScannerOpen(true)}
+                title="Scan barcode with camera"
+              >
+                <Scan className="h-4 w-4" />
+              </Button>
             </div>
           </form>
 
@@ -584,6 +614,12 @@ export function PosPage() {
           />
         </div>
       )}
+
+      <BarcodeScanner
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onBarcodeScanned={handleBarcodeScanned}
+      />
     </>
   )
 }
