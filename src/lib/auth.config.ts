@@ -67,7 +67,7 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     async jwt({ token, user, trigger }) {
       if (user) {
-        token.id = user.id
+        token.id = user.id as string
       }
 
       // Only query DB on sign-in or explicit session update (runs in Node runtime).
