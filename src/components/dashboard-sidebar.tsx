@@ -30,7 +30,12 @@ const sidebarItems = [
   { href: "/dashboard/settings", label: "settings", icon: Settings },
 ] as const
 
-export function DashboardSidebar() {
+interface DashboardSidebarProps {
+  mobile?: boolean
+  onNavigate?: () => void
+}
+
+export function DashboardSidebar({ mobile, onNavigate }: DashboardSidebarProps) {
   const pathname = usePathname()
   const t = useTranslations("nav")
   const locale = pathname.split("/")[1] || "en"
@@ -38,11 +43,19 @@ export function DashboardSidebar() {
   const items = sidebarItems
 
   return (
-    <aside className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col">
+    <aside
+      className={cn(
+        "flex flex-col",
+        mobile
+          ? "w-full"
+          : "hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-56 lg:flex-col"
+      )}
+    >
       <div className="flex flex-col gap-2 border-r bg-card px-4 py-6 h-full">
         <Link
           href={`/${locale}/dashboard`}
           className="flex items-center gap-2 px-2 mb-6"
+          onClick={onNavigate}
         >
           <Store className="h-6 w-6 text-primary" />
           <span className="font-bold text-lg">RetailPOS</span>
@@ -58,6 +71,7 @@ export function DashboardSidebar() {
               <Link
                 key={item.href}
                 href={href}
+                onClick={onNavigate}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   isActive
