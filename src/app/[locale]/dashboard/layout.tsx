@@ -15,10 +15,10 @@ import {
   BarChart3,
   Settings,
   Store,
+  X,
 } from "lucide-react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
@@ -52,6 +52,17 @@ export default function DashboardLayout({
     }
   }, [status, router, locale])
 
+  React.useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = ""
+    }
+    return () => {
+      document.body.style.overflow = ""
+    }
+  }, [mobileMenuOpen])
+
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -74,43 +85,57 @@ export default function DashboardLayout({
     <div className="min-h-screen">
       <DashboardSidebar />
 
-      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="p-0 w-56">
-          <div className="flex flex-col h-full bg-card px-4 py-6">
-            <Link
-              href={`/${locale}/dashboard`}
-              className="flex items-center gap-2 px-2 mb-6"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <Store className="h-6 w-6 text-primary" />
-              <span className="font-bold text-lg">RetailPOS</span>
-            </Link>
-            <nav className="flex flex-col gap-1">
-              {mobileNavItems.map((item) => {
-                const href = `/${locale}${item.href}`
-                const isActive = pathname === href
-                const Icon = item.icon
-                return (
-                  <Link
-                    key={item.href}
-                    href={href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                )
-              })}
-            </nav>
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="fixed inset-0 bg-black/80 animate-in fade-in duration-300"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="fixed inset-y-0 left-0 z-50 w-72 bg-card shadow-xl animate-in slide-in-from-left duration-300">
+            <div className="flex h-full flex-col overflow-y-auto px-4 py-6">
+              <div className="mb-6 flex items-center justify-between">
+                <Link
+                  href={`/${locale}/dashboard`}
+                  className="flex items-center gap-2 px-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Store className="h-6 w-6 text-primary" />
+                  <span className="font-bold text-lg">RetailPOS</span>
+                </Link>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-md p-1 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <nav className="flex flex-col gap-1">
+                {mobileNavItems.map((item) => {
+                  const href = `/${locale}${item.href}`
+                  const isActive = pathname === href
+                  const Icon = item.icon
+                  return (
+                    <Link
+                      key={item.href}
+                      href={href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </nav>
+            </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </div>
+      )}
 
       <div className="lg:pl-56">
         <DashboardHeader onMenuClick={() => setMobileMenuOpen(true)} />
