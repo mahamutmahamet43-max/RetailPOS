@@ -88,10 +88,10 @@ export default function DashboardLayout({
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="fixed inset-0 bg-black/80 animate-in fade-in duration-300"
+            className="fixed inset-0 bg-black/80 transition-opacity duration-300"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-72 bg-card shadow-xl animate-in slide-in-from-left duration-300">
+          <div             className="fixed inset-y-0 left-0 z-50 w-72 bg-card shadow-xl transition-transform duration-300">
             <div className="flex h-full flex-col overflow-y-auto px-4 py-6">
               <div className="mb-6 flex items-center justify-between">
                 <Link

@@ -1,4 +1,4 @@
-const CACHE_NAME = "retailpos-v1"
+const CACHE_NAME = "retailpos-v2"
 const STATIC_ASSETS = [
   "/",
   "/offline",
@@ -29,17 +29,35 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request)
+  const url = new URL(event.request.url)
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.status === 200) {
+            const cloned = response.clone()
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, cloned)
+            })
+          }
+          return response
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cached) => {
+            return cached || caches.match("/offline")
+          })
+        })
+    )
+    return
+  }
+
+  if (/\.(js|css|png|svg|ico|woff2?)$/.test(url.pathname)) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        const fetchPromise = fetch(event.request)
           .then((response) => {
-            if (
-              response.status === 200 &&
-              response.type === "basic" &&
-              /\.(js|css|png|svg|ico|woff2?)$/.test(event.request.url)
-            ) {
+            if (response.status === 200) {
               const cloned = response.clone()
               caches.open(CACHE_NAME).then((cache) => {
                 cache.put(event.request, cloned)
@@ -47,10 +65,19 @@ self.addEventListener("fetch", (event) => {
             }
             return response
           })
-          .catch(() => {
-            return caches.match("/offline")
-          })
-      )
+          .catch(() => cached)
+
+        return cached || fetchPromise
+      })
+    )
+    return
+  }
+
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      return cached || fetch(event.request).catch(() => {
+        return caches.match("/offline")
+      })
     })
   )
 })
