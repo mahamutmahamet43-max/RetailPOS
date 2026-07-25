@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
+import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,6 +24,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { Product, CategoryInfo } from "./products-table"
+
+interface ProductUnitEntry {
+  key: string
+  id?: string
+  name: string
+  conversionFactor: string
+  sellingPrice: string
+  barcode: string
+  isDefaultSaleUnit: boolean
+}
 
 interface ProductDialogProps {
   open: boolean
@@ -57,6 +68,8 @@ export function ProductDialog({
   const [isActive, setIsActive] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState("")
+  const [productUnits, setProductUnits] = React.useState<ProductUnitEntry[]>([])
+  const [showUnits, setShowUnits] = React.useState(false)
 
   React.useEffect(() => {
     if (open) {
@@ -75,8 +88,60 @@ export function ProductDialog({
       setCategoryId(product?.categoryId || "")
       setIsActive(product?.isActive ?? true)
       setError("")
+      setProductUnits([])
+      setShowUnits(false)
+      if (isEdit && product?.id) {
+        loadProductUnits(product.id)
+      }
     }
   }, [open, product])
+
+  async function loadProductUnits(productId: string) {
+    try {
+      const res = await fetch(`/api/products/${productId}`)
+      if (res.ok) {
+        const data = await res.json()
+        const units = (data.productUnits || []).map((u: Record<string, unknown>) => ({
+          key: u.id as string,
+          id: u.id as string,
+          name: (u.name as string) || "",
+          conversionFactor: String(u.conversionFactor || "1"),
+          sellingPrice: u.sellingPrice ? String(u.sellingPrice) : "",
+          barcode: (u.barcode as string) || "",
+          isDefaultSaleUnit: (u.isDefaultSaleUnit as boolean) || false,
+        }))
+        setProductUnits(units)
+        setShowUnits(units.length > 0)
+      }
+    } catch {
+      console.error("Failed to load product units")
+    }
+  }
+
+  function addUnit() {
+    setProductUnits((prev) => [
+      ...prev,
+      {
+        key: `new-${Date.now()}`,
+        name: "",
+        conversionFactor: "1",
+        sellingPrice: "",
+        barcode: "",
+        isDefaultSaleUnit: false,
+      },
+    ])
+    setShowUnits(true)
+  }
+
+  function removeUnit(key: string) {
+    setProductUnits((prev) => prev.filter((u) => u.key !== key))
+  }
+
+  function updateUnit(key: string, field: keyof ProductUnitEntry, value: string | boolean) {
+    setProductUnits((prev) =>
+      prev.map((u) => (u.key === key ? { ...u, [field]: value } : u))
+    )
+  }
 
   async function fetchCategories() {
     try {
@@ -129,6 +194,18 @@ export function ProductDialog({
         unit: unit || null,
         categoryId,
         isActive,
+        productUnits: showUnits
+          ? productUnits
+              .filter((u) => u.name.trim())
+              .map((u) => ({
+                id: u.id || null,
+                name: u.name.trim(),
+                conversionFactor: parseFloat(u.conversionFactor) || 1,
+                sellingPrice: u.sellingPrice ? parseFloat(u.sellingPrice) : null,
+                barcode: u.barcode || null,
+                isDefaultSaleUnit: u.isDefaultSaleUnit,
+              }))
+          : [],
       })
 
       const res = await fetch(url, {
@@ -154,7 +231,7 @@ export function ProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? t("edit") : t("add")}</DialogTitle>
           <DialogDescription>
@@ -251,6 +328,80 @@ export function ProductDialog({
                   placeholder={t("unitPlaceholder")}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t("additionalUnits")}</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addUnit}
+                  className="h-7 text-xs"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  {t("addUnit")}
+                </Button>
+              </div>
+              {showUnits && productUnits.length > 0 && (
+                <div className="space-y-3 rounded-lg border p-3">
+                  {productUnits.map((pu) => (
+                    <div key={pu.key} className="grid grid-cols-[1fr_80px_80px_80px_28px] gap-2 items-end">
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("unitName")}</Label>
+                        <Input
+                          value={pu.name}
+                          onChange={(e) => updateUnit(pu.key, "name", e.target.value)}
+                          placeholder="e.g. Box, Case"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("conversionFactor")}</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={pu.conversionFactor}
+                          onChange={(e) => updateUnit(pu.key, "conversionFactor", e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("sellingPrice")}</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={pu.sellingPrice}
+                          onChange={(e) => updateUnit(pu.key, "sellingPrice", e.target.value)}
+                          placeholder="optional"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("barcode")}</Label>
+                        <Input
+                          value={pu.barcode}
+                          onChange={(e) => updateUnit(pu.key, "barcode", e.target.value)}
+                          placeholder="optional"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removeUnit(pu.key)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

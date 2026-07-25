@@ -181,7 +181,11 @@
     "searchCategory": "Raadi qaybaha...",
     "pagination": "Bogga {page} ee {totalPages}",
     "showing": "Muujinaya {from}-{to} ee {total}",
-    "itemsPerPage": "Alaab boggiiba"
+    "itemsPerPage": "Alaab boggiiba",
+    "additionalUnits": "Halbeegyada Dheeraadka ah",
+    "addUnit": "Ku dar Halbeeg",
+    "unitName": "Magaca Halbeegga",
+    "conversionFactor": "Xidhiidhka Beddelka"
   },
   "customers": {
     "title": "Macmiilasha",

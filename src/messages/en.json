@@ -181,7 +181,11 @@
     "searchCategory": "Search categories...",
     "pagination": "Page {page} of {totalPages}",
     "showing": "Showing {from}-{to} of {total}",
-    "itemsPerPage": "Items per page"
+    "itemsPerPage": "Items per page",
+    "additionalUnits": "Additional Units",
+    "addUnit": "Add Unit",
+    "unitName": "Unit Name",
+    "conversionFactor": "Conversion Factor"
   },
   "customers": {
     "title": "Customers",

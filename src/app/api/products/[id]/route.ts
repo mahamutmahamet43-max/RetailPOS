@@ -20,7 +20,7 @@ export async function GET(
 
     const product = await prisma.product.findFirst({
       where: { id, storeId: store.id },
-      include: { category: true },
+      include: { category: true, productUnits: true },
     })
 
     if (!product) {
@@ -77,6 +77,7 @@ export async function PATCH(
       unit,
       isActive,
       categoryId,
+      productUnits,
     } = body
 
     if (name !== undefined) {
@@ -125,6 +126,50 @@ export async function PATCH(
       }
     }
 
+    if (Array.isArray(productUnits)) {
+      const existingUnits = await prisma.productUnit.findMany({
+        where: { productId: id },
+      })
+      const existingIds = existingUnits.map((u) => u.id)
+      const incomingIds = productUnits.filter((u: { id?: string | null }) => u.id).map((u: { id: string }) => u.id)
+      const toDelete = existingIds.filter((eid) => !incomingIds.includes(eid))
+
+      if (toDelete.length > 0) {
+        await prisma.productUnit.deleteMany({
+          where: { id: { in: toDelete } },
+        })
+      }
+
+      for (const pu of productUnits) {
+        if (pu.name && String(pu.name).trim()) {
+          if (pu.id) {
+            await prisma.productUnit.update({
+              where: { id: pu.id },
+              data: {
+                name: String(pu.name).trim(),
+                conversionFactor: Number(pu.conversionFactor) || 1,
+                sellingPrice: pu.sellingPrice != null ? Number(pu.sellingPrice) : null,
+                barcode: pu.barcode || null,
+                isDefaultSaleUnit: Boolean(pu.isDefaultSaleUnit),
+              },
+            })
+          } else {
+            await prisma.productUnit.create({
+              data: {
+                productId: id,
+                name: String(pu.name).trim(),
+                conversionFactor: Number(pu.conversionFactor) || 1,
+                sellingPrice: pu.sellingPrice != null ? Number(pu.sellingPrice) : null,
+                barcode: pu.barcode || null,
+                isBaseUnit: false,
+                isDefaultSaleUnit: Boolean(pu.isDefaultSaleUnit),
+              },
+            })
+          }
+        }
+      }
+    }
+
     const product = await prisma.product.update({
       where: { id },
       data: {
@@ -142,7 +187,7 @@ export async function PATCH(
         ...(isActive !== undefined && { isActive }),
         ...(categoryId !== undefined && { categoryId }),
       },
-      include: { category: true },
+      include: { category: true, productUnits: true },
     })
 
     return NextResponse.json(product)

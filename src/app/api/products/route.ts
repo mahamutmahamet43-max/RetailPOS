@@ -113,11 +113,27 @@ export async function POST(request: Request) {
         sellingPrice: data.sellingPrice,
         stockQuantity: data.stockQuantity,
         minimumStock: data.minimumStock,
+        brand: data.brand || null,
+        unit: data.unit || null,
         isActive: data.isActive,
         storeId: store.id,
         categoryId: data.categoryId,
+        ...(data.productUnits && data.productUnits.length > 0
+          ? {
+              productUnits: {
+                create: data.productUnits.map((pu) => ({
+                  name: pu.name.trim(),
+                  conversionFactor: pu.conversionFactor,
+                  sellingPrice: pu.sellingPrice,
+                  barcode: pu.barcode || null,
+                  isDefaultSaleUnit: pu.isDefaultSaleUnit,
+                  isBaseUnit: false,
+                })),
+              },
+            }
+          : {}),
       },
-      include: { category: { select: { id: true, name: true } } },
+      include: { category: { select: { id: true, name: true } }, productUnits: true },
     })
 
     return NextResponse.json(product, { status: 201 })

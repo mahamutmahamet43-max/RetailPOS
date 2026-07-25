@@ -26,6 +26,15 @@ export const nonNegativeNumberSchema = z
   .number()
   .min(0, "Value must be non-negative")
 
+export const productUnitSchema = z.object({
+  id: z.string().optional().nullable(),
+  name: z.string().min(1, "Unit name is required"),
+  conversionFactor: z.number().positive("Conversion factor must be positive"),
+  sellingPrice: z.number().min(0).optional().nullable(),
+  barcode: z.string().optional().nullable(),
+  isDefaultSaleUnit: z.boolean().default(false),
+})
+
 export const productSchema = z.object({
   name: z.string().min(1, "Product name is required"),
   barcode: z.string().optional().nullable(),
@@ -38,6 +47,9 @@ export const productSchema = z.object({
   description: z.string().optional().nullable(),
   imageUrl: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
+  brand: z.string().optional().nullable(),
+  unit: z.string().optional().nullable(),
+  productUnits: z.array(productUnitSchema).optional().default([]),
 })
 
 export const categorySchema = z.object({
@@ -168,6 +180,7 @@ export const productUpdateSchema = z.object({
   isActive: z.boolean().optional(),
   brand: z.string().optional().nullable(),
   unit: z.string().optional().nullable(),
+  productUnits: z.array(productUnitSchema).optional(),
 })
 
 export function successResponse<T>(data: T, status = 200): NextResponse {
