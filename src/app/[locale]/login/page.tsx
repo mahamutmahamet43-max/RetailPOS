@@ -93,6 +93,14 @@ export default function LoginPage() {
                   required
                   autoComplete="current-password"
                 />
+                <div className="text-right">
+                  <Link
+                    href={`/${locale}/forgot-password`}
+                    className="text-xs text-muted-foreground hover:text-primary"
+                  >
+                    {t("forgotPassword")}
+                  </Link>
+                </div>
               </div>
 
               {error && (
