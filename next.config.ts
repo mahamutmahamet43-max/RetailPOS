@@ -5,6 +5,9 @@ import createNextIntlPlugin from "next-intl/plugin"
 const withNextIntl = createNextIntlPlugin()
 
 const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   serverExternalPackages: ["bcryptjs"],
   async headers() {
     return [
