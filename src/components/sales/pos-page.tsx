@@ -76,13 +76,34 @@ export function PosPage() {
   const [barcode, setBarcode] = React.useState("")
   const [searchQuery, setSearchQuery] = React.useState("")
   const [searchResults, setSearchResults] = React.useState<ProductResult[]>([])
-  const [cart, setCart] = React.useState<CartItem[]>([])
+  const [cart, setCart] = React.useState<CartItem[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      const saved = localStorage.getItem("pos-cart")
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
   const [customers, setCustomers] = React.useState<Customer[]>([])
-  const [selectedCustomerId, setSelectedCustomerId] = React.useState("")
-  const [paymentMethod, setPaymentMethod] = React.useState("CASH")
-  const [amountPaid, setAmountPaid] = React.useState("")
-  const [discount, setDiscount] = React.useState("0")
-  const [tax, setTax] = React.useState("0")
+  const [selectedCustomerId, setSelectedCustomerId] = React.useState(() => {
+    if (typeof window === "undefined") return ""
+    return localStorage.getItem("pos-customer") || ""
+  })
+  const [paymentMethod, setPaymentMethod] = React.useState(() => {
+    if (typeof window === "undefined") return "CASH"
+    return localStorage.getItem("pos-payment-method") || "CASH"
+  })
+  const [amountPaid, setAmountPaid] = React.useState(() => {
+    if (typeof window === "undefined") return ""
+    return localStorage.getItem("pos-amount-paid") || ""
+  })
+  const [discount, setDiscount] = React.useState(() => {
+    if (typeof window === "undefined") return "0"
+    return localStorage.getItem("pos-discount") || "0"
+  })
+  const [tax, setTax] = React.useState(() => {
+    if (typeof window === "undefined") return "0"
+    return localStorage.getItem("pos-tax") || "0"
+  })
   const [checkingOut, setCheckingOut] = React.useState(false)
   const [error, setError] = React.useState("")
   const [lastSale, setLastSale] = React.useState<any>(null)
@@ -93,6 +114,25 @@ export function PosPage() {
   const searchRef = React.useRef<HTMLInputElement>(null)
 
   const [isOnline, setIsOnline] = React.useState(true)
+
+  React.useEffect(() => {
+    localStorage.setItem("pos-cart", JSON.stringify(cart))
+  }, [cart])
+  React.useEffect(() => {
+    localStorage.setItem("pos-customer", selectedCustomerId)
+  }, [selectedCustomerId])
+  React.useEffect(() => {
+    localStorage.setItem("pos-payment-method", paymentMethod)
+  }, [paymentMethod])
+  React.useEffect(() => {
+    localStorage.setItem("pos-amount-paid", amountPaid)
+  }, [amountPaid])
+  React.useEffect(() => {
+    localStorage.setItem("pos-discount", discount)
+  }, [discount])
+  React.useEffect(() => {
+    localStorage.setItem("pos-tax", tax)
+  }, [tax])
 
   React.useEffect(() => {
     setIsOnline(navigator.onLine)
@@ -250,6 +290,12 @@ export function PosPage() {
     setError("")
     setSelectedCustomerId("")
     setPaymentMethod("CASH")
+    localStorage.removeItem("pos-cart")
+    localStorage.removeItem("pos-customer")
+    localStorage.removeItem("pos-payment-method")
+    localStorage.removeItem("pos-amount-paid")
+    localStorage.removeItem("pos-discount")
+    localStorage.removeItem("pos-tax")
   }
 
   async function handleBarcodeScanned(scannedBarcode: string) {

@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from "dexie"
 
 export interface OfflineProduct {
   id: string
+  storeId: string
   name: string
   barcode: string | null
   sku: string | null
@@ -20,6 +21,7 @@ export interface OfflineProduct {
 
 export interface OfflineCustomer {
   id: string
+  storeId: string
   customerCode: string
   firstName: string
   lastName: string | null
@@ -34,6 +36,7 @@ export interface OfflineCustomer {
 
 export interface OfflineCategory {
   id: string
+  storeId: string
   name: string
   description: string | null
   syncedAt: number
@@ -71,6 +74,14 @@ db.version(1).stores({
   products: "id, name, barcode, syncedAt",
   customers: "id, firstName, lastName, phone, syncedAt",
   categories: "id, name, syncedAt",
+  settings: "storeId",
+  pendingSales: "localId, status, createdAt",
+})
+
+db.version(2).stores({
+  products: "id, storeId, name, barcode, syncedAt",
+  customers: "id, storeId, firstName, lastName, phone, syncedAt",
+  categories: "id, storeId, name, syncedAt",
   settings: "storeId",
   pendingSales: "localId, status, createdAt",
 })

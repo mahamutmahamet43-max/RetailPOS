@@ -18,8 +18,8 @@ export function OfflineBanner() {
       }`}
     >
       {isOnline
-        ? `${pendingCount} sale(s) pending sync`
-        : "You are offline — sales will sync when connected"}
+        ? t("pendingSync", { count: pendingCount })
+        : `${t("offline")} — ${t("offlineSync")}`}
     </div>
   )
 }

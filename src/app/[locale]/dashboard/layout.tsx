@@ -24,17 +24,18 @@ import { cn } from "@/lib/utils"
 import { SyncManager } from "@/components/layout/sync-manager"
 import { OfflineBanner } from "@/components/layout/offline-banner"
 import { refreshCache } from "@/lib/offline-service"
+import { useTranslations } from "next-intl"
 
 const mobileNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/products", label: "Products", icon: Package },
-  { href: "/dashboard/categories", label: "Categories", icon: Tags },
-  { href: "/dashboard/customers", label: "Customers", icon: Users },
-  { href: "/dashboard/sales", label: "Sales", icon: ShoppingCart },
-  { href: "/dashboard/purchases", label: "Purchases", icon: ShoppingBag },
-  { href: "/dashboard/inventory", label: "Inventory", icon: Warehouse },
-  { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/products", label: "products", icon: Package },
+  { href: "/dashboard/categories", label: "categories", icon: Tags },
+  { href: "/dashboard/customers", label: "customers", icon: Users },
+  { href: "/dashboard/sales", label: "sales", icon: ShoppingCart },
+  { href: "/dashboard/purchases", label: "purchases", icon: ShoppingBag },
+  { href: "/dashboard/inventory", label: "inventory", icon: Warehouse },
+  { href: "/dashboard/reports", label: "reports", icon: BarChart3 },
+  { href: "/dashboard/settings", label: "settings", icon: Settings },
 ]
 
 export default function DashboardLayout({
@@ -47,6 +48,7 @@ export default function DashboardLayout({
   const params = useParams()
   const pathname = usePathname()
   const locale = params.locale as string
+  const navT = useTranslations("nav")
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
 
   React.useEffect(() => {
@@ -138,7 +140,7 @@ export default function DashboardLayout({
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
-                      {item.label}
+                      {navT(item.label)}
                     </Link>
                   )
                 })}

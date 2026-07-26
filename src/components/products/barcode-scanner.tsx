@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useTranslations } from "next-intl"
 
 interface BarcodeScannerProps {
   open: boolean
@@ -21,6 +22,7 @@ export function BarcodeScanner({ open, onOpenChange, onBarcodeScanned }: Barcode
   const [manualBarcode, setManualBarcode] = React.useState("")
   const [mode, setMode] = React.useState<"camera" | "manual">("camera")
   const [cameraError, setCameraError] = React.useState("")
+  const t = useTranslations("products")
 
   const scannerRef = React.useRef<any>(null)
   const containerId = "product-barcode-scanner"
@@ -52,11 +54,11 @@ export function BarcodeScanner({ open, onOpenChange, onBarcodeScanned }: Barcode
         },
         () => {}
       ).then(() => { running = true }).catch(() => {
-        setCameraError("Camera not available. Try manual entry.")
+        setCameraError(t("cameraNotAvailable"))
         setMode("manual")
       })
     }).catch(() => {
-      setCameraError("Scanner library failed to load")
+      setCameraError(t("scannerLoadFailed"))
       setMode("manual")
     })
 
@@ -66,7 +68,7 @@ export function BarcodeScanner({ open, onOpenChange, onBarcodeScanned }: Barcode
         scannerRef.current = null
       }
     }
-  }, [open, mode, onBarcodeScanned, onOpenChange])
+  }, [open, mode, onBarcodeScanned, onOpenChange, t])
 
   function handleManualSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -79,7 +81,7 @@ export function BarcodeScanner({ open, onOpenChange, onBarcodeScanned }: Barcode
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Scan Barcode</DialogTitle>
+          <DialogTitle>{t("scanBarcode")}</DialogTitle>
         </DialogHeader>
 
         <div className="flex gap-2 mb-3">
@@ -90,7 +92,7 @@ export function BarcodeScanner({ open, onOpenChange, onBarcodeScanned }: Barcode
             onClick={() => setMode("camera")}
           >
             <Camera className="mr-1 h-4 w-4" />
-            Camera
+            {t("camera")}
           </Button>
           <Button
             type="button"
@@ -99,7 +101,7 @@ export function BarcodeScanner({ open, onOpenChange, onBarcodeScanned }: Barcode
             onClick={() => setMode("manual")}
           >
             <Search className="mr-1 h-4 w-4" />
-            Type
+            {t("type")}
           </Button>
         </div>
 
@@ -110,7 +112,7 @@ export function BarcodeScanner({ open, onOpenChange, onBarcodeScanned }: Barcode
               <p className="text-xs text-destructive">{cameraError}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Point your camera at a barcode
+              {t("pointCamera")}
             </p>
           </div>
         )}
@@ -120,12 +122,12 @@ export function BarcodeScanner({ open, onOpenChange, onBarcodeScanned }: Barcode
             <Input
               value={manualBarcode}
               onChange={(e) => setManualBarcode(e.target.value)}
-              placeholder="Enter barcode number..."
+              placeholder={t("enterBarcode")}
               autoFocus
             />
             <Button type="submit" className="w-full">
               <Scan className="mr-2 h-4 w-4" />
-              Look Up
+              {t("lookUp")}
             </Button>
           </form>
         )}

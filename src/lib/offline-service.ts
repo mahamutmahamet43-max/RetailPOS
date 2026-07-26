@@ -7,6 +7,7 @@ export async function cacheProducts(storeId: string) {
     const data = await res.json()
     const products = (data.products || data || []).map((p: any) => ({
       id: p.id,
+      storeId,
       name: p.name,
       barcode: p.barcode || null,
       sku: p.sku || null,
@@ -33,6 +34,7 @@ export async function cacheCustomers(storeId: string) {
     const data = await res.json()
     const customers = (data.customers || []).map((c: any) => ({
       id: c.id,
+      storeId,
       customerCode: c.customerCode,
       firstName: c.firstName,
       lastName: c.lastName || null,
@@ -55,6 +57,7 @@ export async function cacheCategories(storeId: string) {
     const data = await res.json()
     const categories = (data.categories || data || []).map((c: any) => ({
       id: c.id,
+      storeId,
       name: c.name,
       description: c.description || null,
       syncedAt: Date.now(),

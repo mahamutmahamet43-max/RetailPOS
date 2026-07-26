@@ -133,7 +133,7 @@ export function CustomerDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? t("edit") : t("add")}</DialogTitle>
           <DialogDescription>
-            {isEdit ? t("edit") : t("add")}
+            {isEdit ? t("edit") + " " + t("firstName").toLowerCase() : t("add") + " " + t("firstName").toLowerCase()}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>

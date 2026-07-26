@@ -18,10 +18,10 @@ export function SyncManager() {
     const doSync = async () => {
       const result = await processPendingSales()
       if (result.synced > 0) {
-        toast.success(`${result.synced} sale(s) synced successfully`)
+        toast.success(t("syncedSuccess", { count: result.synced }))
       }
       if (result.conflicted > 0) {
-        toast.error(`${result.conflicted} sale(s) have conflicts — check reports`)
+        toast.error(t("syncConflict", { count: result.conflicted }))
       }
       await refreshPendingCount()
       syncingRef.current = false

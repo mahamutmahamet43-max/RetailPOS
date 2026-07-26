@@ -74,11 +74,11 @@ export function CustomerCreditPanel({
     e.preventDefault()
     const amt = parseFloat(amount)
     if (!amt || amt <= 0) {
-      toast.error("Amount must be positive")
+      toast.error(common("amountMustBePositive"))
       return
     }
     if (amt > balance) {
-      toast.error(`Payment amount ($${amt.toFixed(2)}) exceeds outstanding balance ($${balance.toFixed(2)})`)
+      toast.error(common("error"))
       return
     }
     setSubmitting(true)

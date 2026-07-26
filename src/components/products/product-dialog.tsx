@@ -235,7 +235,7 @@ export function ProductDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? t("edit") : t("add")}</DialogTitle>
           <DialogDescription>
-            {isEdit ? t("edit") : t("add")}
+            {isEdit ? t("edit") + " " + t("name").toLowerCase() : t("add") + " " + t("name").toLowerCase()}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
