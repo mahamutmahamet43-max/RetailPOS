@@ -38,7 +38,10 @@ export async function POST(
 
     const sale = await prisma.sale.findFirst({
       where: { id, storeId: store.id },
-      include: { items: true },
+      include: {
+        items: true,
+        customer: { select: { id: true, firstName: true, lastName: true, currentBalance: true } },
+      },
     })
 
     if (!sale) {
@@ -52,55 +55,86 @@ export async function POST(
       )
     }
 
-    for (const refundItem of refundItems) {
-      const saleItem = sale.items.find((i) => i.id === refundItem.itemId)
-      if (!saleItem) {
-        return NextResponse.json(
-          { error: `Sale item ${refundItem.itemId} not found` },
-          { status: 404 }
-        )
-      }
-      const availableToRefund = saleItem.quantity - saleItem.returnedQuantity
-      if (refundItem.quantity > availableToRefund) {
-        return NextResponse.json(
-          { error: `Cannot refund ${refundItem.quantity} of "${saleItem.productName}", only ${availableToRefund} available` },
-          { status: 400 }
-        )
-      }
-    }
-
     const updated = await prisma.$transaction(async (tx) => {
+      const currentSale = await tx.sale.findFirst({
+        where: { id, storeId: store.id },
+        select: { status: true },
+      })
+      if (!currentSale || currentSale.status !== "COMPLETED") {
+        throw new Error("Sale is no longer available for refund")
+      }
+
+      const freshCustomer = sale.customerId ? await tx.customer.findUnique({
+        where: { id: sale.customerId },
+        select: { currentBalance: true },
+      }) : null
+
       for (const refundItem of refundItems) {
-        const saleItem = sale.items.find((i) => i.id === refundItem.itemId)!
+        const saleItem = sale.items.find((i) => i.id === refundItem.itemId)
+        if (!saleItem) {
+          throw new Error(`Sale item ${refundItem.itemId} not found`)
+        }
+
+        const currentSaleItem = await tx.saleItem.findUnique({
+          where: { id: refundItem.itemId },
+        })
+        if (!currentSaleItem) {
+          throw new Error(`Sale item ${refundItem.itemId} not found`)
+        }
+
+        const availableToRefund = currentSaleItem.quantity - currentSaleItem.returnedQuantity
+        if (refundItem.quantity > availableToRefund) {
+          throw new Error(
+            `Cannot refund ${refundItem.quantity} of "${saleItem.productName}", only ${availableToRefund} available`
+          )
+        }
 
         await tx.saleItem.update({
           where: { id: refundItem.itemId },
           data: { returnedQuantity: { increment: refundItem.quantity } },
         })
 
-        const product = await tx.product.findUnique({
+        const productBefore = await tx.product.findUnique({
           where: { id: saleItem.productId },
+          select: { stockQuantity: true },
         })
 
-        if (product) {
-          const baseQuantity = Math.round(refundItem.quantity * saleItem.unitConversionFactor)
-          const newStock = product.stockQuantity + baseQuantity
+        if (!productBefore) continue
 
-          await tx.product.update({
-            where: { id: saleItem.productId },
-            data: { stockQuantity: newStock },
-          })
+        const baseQuantity = Math.round(refundItem.quantity * saleItem.unitConversionFactor)
 
-          await tx.inventoryTransaction.create({
+        await tx.product.update({
+          where: { id: saleItem.productId },
+          data: { stockQuantity: { increment: baseQuantity } },
+        })
+
+        await tx.inventoryTransaction.create({
+          data: {
+            transactionType: "IN",
+            quantity: baseQuantity,
+            previousStock: productBefore.stockQuantity,
+            newStock: productBefore.stockQuantity + baseQuantity,
+            reason: `Sale ${sale.saleNumber} refund`,
+            reference: sale.saleNumber,
+            storeId: store.id,
+            productId: saleItem.productId,
+            createdBy: auth.userId,
+          },
+        })
+      }
+
+      if (sale.paymentMethod === "CREDIT" && sale.customerId) {
+        const refundAmount = refundItems.reduce((sum, ri) => {
+          const item = sale.items.find((si) => si.id === ri.itemId)
+          return sum + (item ? item.unitPrice * ri.quantity : 0)
+        }, 0)
+
+        if (refundAmount > 0) {
+          await tx.customer.update({
+            where: { id: sale.customerId },
             data: {
-              transactionType: "IN",
-              quantity: baseQuantity,
-              previousStock: product.stockQuantity,
-              newStock,
-              reason: `Refund from sale #${sale.saleNumber}`,
-              storeId: store.id,
-              productId: saleItem.productId,
-              createdBy: auth.userId,
+              currentBalance: { decrement: Math.min(refundAmount, freshCustomer?.currentBalance || 0) },
+              totalCreditSales: { decrement: refundAmount },
             },
           })
         }
@@ -124,6 +158,17 @@ export async function POST(
 
     return NextResponse.json(updated)
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "Sale is no longer available for refund") {
+        return NextResponse.json({ error: error.message }, { status: 400 })
+      }
+      if (error.message.startsWith("Sale item") && error.message.endsWith("not found")) {
+        return NextResponse.json({ error: error.message }, { status: 404 })
+      }
+      if (error.message.startsWith("Cannot refund")) {
+        return NextResponse.json({ error: error.message }, { status: 400 })
+      }
+    }
     logger.error("POST /api/sales/[id]/refund error", error instanceof Error ? error : undefined)
     return NextResponse.json(
       { error: "Internal server error" },

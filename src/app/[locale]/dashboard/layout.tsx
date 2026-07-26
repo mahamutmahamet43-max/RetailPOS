@@ -21,6 +21,9 @@ import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { SyncManager } from "@/components/layout/sync-manager"
+import { OfflineBanner } from "@/components/layout/offline-banner"
+import { refreshCache } from "@/lib/offline-service"
 
 const mobileNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -63,6 +66,12 @@ export default function DashboardLayout({
     }
   }, [mobileMenuOpen])
 
+  React.useEffect(() => {
+    if (session?.user?.id) {
+      refreshCache("me").catch(() => {})
+    }
+  }, [session?.user?.id])
+
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -83,6 +92,8 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen">
+      <SyncManager />
+      <OfflineBanner />
       <DashboardSidebar />
 
       {mobileMenuOpen && (

@@ -49,7 +49,7 @@ export async function GET() {
         }),
         prisma.sale.aggregate({
           where: { storeId, status: "COMPLETED" },
-          _sum: { total: true },
+          _sum: { amountPaid: true },
         }),
         prisma.customer.count({ where: { storeId } }),
         prisma.product.count({ where: { storeId } }),
@@ -60,26 +60,37 @@ export async function GET() {
         prisma.product.count({ where: { storeId, stockQuantity: 0 } }),
       ])
 
-    const todaySalesItems = await prisma.saleItem.aggregate({
-      where: {
-        sale: { storeId, status: "COMPLETED", createdAt: { gte: todayStart, lt: todayEnd } },
-      },
-      _sum: { quantity: true, costPrice: true },
+    const todaySaleItems = await prisma.saleItem.findMany({
+      where: { sale: { storeId, status: "COMPLETED", createdAt: { gte: todayStart, lt: todayEnd } } },
+      select: { costPrice: true, quantity: true, returnedQuantity: true },
     })
+    const dailyCOGS = todaySaleItems.reduce((sum, item) => sum + (item.costPrice || 0) * (item.quantity - (item.returnedQuantity || 0)), 0)
 
-    const todayCost = todaySalesItems._sum.costPrice || 0
+    const weeklySaleItems = await prisma.saleItem.findMany({
+      where: { sale: { storeId, status: "COMPLETED", createdAt: { gte: weekAgo } } },
+      select: { costPrice: true, quantity: true, returnedQuantity: true },
+    })
+    const weeklyCOGS = weeklySaleItems.reduce((sum, item) => sum + (item.costPrice || 0) * (item.quantity - (item.returnedQuantity || 0)), 0)
+
+    const monthlySaleItems = await prisma.saleItem.findMany({
+      where: { sale: { storeId, status: "COMPLETED", createdAt: { gte: monthStart } } },
+      select: { costPrice: true, quantity: true, returnedQuantity: true },
+    })
+    const monthlyCOGS = monthlySaleItems.reduce((sum, item) => sum + (item.costPrice || 0) * (item.quantity - (item.returnedQuantity || 0)), 0)
+
     const todayRevenue = todaySales._sum.total || 0
     const todayOrders = todaySales._count
-    const todayProfit = todayRevenue - todayCost
 
     return NextResponse.json({
       todaySales: todayRevenue,
-      todayProfit: Math.max(0, todayProfit),
+      todayProfit: todayRevenue - dailyCOGS,
       todayOrders,
       weeklySales: weeklySales._sum.total || 0,
+      weeklyProfit: (weeklySales._sum.total || 0) - weeklyCOGS,
       weeklyOrders: weeklySales._count,
       monthlySales: monthlySales._sum.total || 0,
-      totalRevenue: totalRevenue._sum.total || 0,
+      monthlyProfit: (monthlySales._sum.total || 0) - monthlyCOGS,
+      totalRevenue: totalRevenue._sum.amountPaid || 0,
       totalCustomers,
       totalProducts,
       lowStockProducts: lowStock,

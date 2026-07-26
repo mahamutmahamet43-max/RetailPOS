@@ -32,7 +32,7 @@ export async function GET() {
         const orders = stat._count
         const avgOrder = orders > 0 ? totalSales / orders : 0
 
-        const items = await prisma.saleItem.aggregate({
+        const cashierItems = await prisma.saleItem.findMany({
           where: {
             sale: {
               storeId: store.id,
@@ -40,10 +40,10 @@ export async function GET() {
               cashierId: stat.cashierId,
             },
           },
-          _sum: { costPrice: true },
+          select: { costPrice: true, quantity: true, returnedQuantity: true },
         })
-        const cost = items._sum.costPrice || 0
-        const profit = Math.max(0, totalSales - cost)
+        const cost = cashierItems.reduce((sum, item) => sum + (item.costPrice || 0) * (item.quantity - (item.returnedQuantity || 0)), 0)
+        const profit = totalSales - cost
 
         return {
           cashierId: stat.cashierId,

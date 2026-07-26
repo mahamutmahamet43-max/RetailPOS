@@ -23,8 +23,8 @@ export async function GET(request: Request) {
     const to = searchParams.get("to") || ""
     const payment = searchParams.get("payment") || ""
     const cashier = searchParams.get("cashier") || ""
-    const page = parseInt(searchParams.get("page") || "1")
-    const limit = parseInt(searchParams.get("limit") || "10")
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "10") || 10))
     const skip = (page - 1) * limit
 
     const where: Prisma.SaleWhereInput = {
@@ -96,15 +96,16 @@ export async function POST(request: Request) {
     const validation = validateOrError(saleSchema, body)
     if (!validation.success) return validation.response
 
-    const { items, customerId, paymentMethod, amountPaid, discount, tax } = validation.data
+    const { items, customerId, paymentMethod, amountPaid, discount, tax, localId } = validation.data
 
     const paid = amountPaid || 0
 
+    const itemDiscounts = items.reduce((sum, item) => sum + (item.discount || 0), 0)
     const saleSubtotal = items.reduce(
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    const saleTotal = saleSubtotal - discount + tax
+    const saleTotal = saleSubtotal - itemDiscounts - discount + tax
 
     const subscription = await getStoreSubscription(store.id)
     if (!subscription || !isSubscriptionActive(subscription)) {
@@ -155,14 +156,6 @@ export async function POST(request: Request) {
           { status: 404 }
         )
       }
-      if (product.stockQuantity < item.quantity) {
-        return NextResponse.json(
-          {
-            error: `Insufficient stock for ${product.name}. Available: ${product.stockQuantity}, requested: ${item.quantity}`,
-          },
-          { status: 400 }
-        )
-      }
     }
 
     if (paymentMethod === "CASH" && paid < saleTotal) {
@@ -172,91 +165,185 @@ export async function POST(request: Request) {
       )
     }
 
+    if (paymentMethod === "CREDIT" && !customerId) {
+      return NextResponse.json(
+        { error: "Customer is required for credit sales" },
+        { status: 400 }
+      )
+    }
+
+    if (paymentMethod === "CREDIT" && customerId) {
+      if (paid > saleTotal) {
+        return NextResponse.json(
+          { error: `Payment amount (${paid}) cannot exceed total (${saleTotal}) for credit sales` },
+          { status: 400 }
+        )
+      }
+      const customer = await prisma.customer.findFirst({
+        where: { id: customerId, storeId: store.id },
+        select: { creditLimit: true, currentBalance: true, firstName: true, lastName: true },
+      })
+      if (!customer) {
+        return NextResponse.json({ error: "Customer not found" }, { status: 404 })
+      }
+      const remaining = saleTotal - paid
+      if (remaining > 0 && customer.creditLimit > 0) {
+        const newBalance = customer.currentBalance + remaining
+        if (newBalance > customer.creditLimit) {
+          return NextResponse.json(
+            {
+              error: `Credit limit exceeded. Customer ${customer.firstName} ${customer.lastName} has a credit limit of $${customer.creditLimit.toFixed(2)} with $${customer.currentBalance.toFixed(2)} outstanding. This sale would add $${remaining.toFixed(2)} (total: $${newBalance.toFixed(2)}).`,
+              creditLimit: customer.creditLimit,
+              currentBalance: customer.currentBalance,
+              requestedCredit: remaining,
+            },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
+    if (paymentMethod !== "CASH" && paymentMethod !== "CREDIT") {
+      if (paid <= 0) {
+        return NextResponse.json(
+          { error: `Payment amount must be greater than zero for ${paymentMethod} payments` },
+          { status: 400 }
+        )
+      }
+      if (paid < saleTotal) {
+        return NextResponse.json(
+          { error: `Payment amount (${paid}) is less than total (${saleTotal}). ${paymentMethod} payments must be paid in full.` },
+          { status: 400 }
+        )
+      }
+    }
+
     const changeGiven = Math.max(0, paid - saleTotal)
 
-    const lastSale = await prisma.sale.findFirst({
-      where: { storeId: store.id },
-      orderBy: { createdAt: "desc" },
-      select: { saleNumber: true },
-    })
-
-    let nextNumber = 1
-    if (lastSale?.saleNumber) {
-      const num = parseInt(lastSale.saleNumber.replace("SALE-", ""))
-      if (!isNaN(num)) nextNumber = num + 1
-    }
-    const saleNumber = `SALE-${String(nextNumber).padStart(6, "0")}`
-
-    let saleId = ""
-
-    await prisma.$transaction(async (tx) => {
-      const createdSale = await tx.sale.create({
-        data: {
-          saleNumber,
-          subtotal: saleSubtotal,
-          discount,
-          tax,
-          total: saleTotal,
-          amountPaid: paid,
-          changeGiven,
-          paymentMethod,
-          status: "COMPLETED",
-          storeId: store.id,
-          customerId: customerId || null,
-          cashierId: session.user.id,
-          items: {
-            create: items.map((item) => {
-              const product = productMap.get(item.productId)!
-              const itemTotal = item.unitPrice * item.quantity - item.discount
-              return {
-                productId: item.productId,
-                productName: item.productName,
-                barcode: item.barcode || null,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                costPrice: product.costPrice,
-                discount: item.discount,
-                total: itemTotal,
-              }
-            }),
-          },
+    if (localId) {
+      const existingSale = await prisma.sale.findFirst({
+        where: { localId, storeId: store.id },
+        include: {
+          items: true,
+          customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+          cashier: { select: { id: true, name: true } },
         },
       })
-
-      saleId = createdSale.id
-
-      for (const item of items) {
-        const product = productMap.get(item.productId)!
-        const newStock = product.stockQuantity - item.quantity
-
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stockQuantity: newStock },
-        })
-
-        await tx.inventoryTransaction.create({
-          data: {
-            transactionType: "OUT",
-            quantity: item.quantity,
-            previousStock: product.stockQuantity,
-            newStock,
-            reason: `Sale #${saleNumber}`,
-            storeId: store.id,
-            productId: item.productId,
-            createdBy: session.user.id,
-          },
-        })
+      if (existingSale) {
+        return NextResponse.json(existingSale)
       }
-    })
+    }
 
-    const sale = await prisma.sale.findUnique({
-      where: { id: saleId },
-      include: {
-        items: true,
-        customer: { select: { id: true, firstName: true, lastName: true, email: true } },
-        cashier: { select: { id: true, name: true } },
-      },
-    })
+    let sale = null
+    let retries = 3
+    while (retries > 0) {
+      try {
+        const lastSale = await prisma.sale.findFirst({
+          where: { storeId: store.id },
+          orderBy: { createdAt: "desc" },
+          select: { saleNumber: true },
+        })
+        let nextNumber = 1
+        if (lastSale?.saleNumber) {
+          const match = lastSale.saleNumber.match(/(\d+)$/)
+          if (match) nextNumber = parseInt(match[1], 10) + 1
+        }
+        const saleNumber = `SALE-${String(nextNumber).padStart(6, "0")}`
+
+        sale = await prisma.$transaction(async (tx) => {
+          const createdSale = await tx.sale.create({
+            data: {
+              saleNumber,
+              localId: localId || null,
+              subtotal: saleSubtotal,
+              discount,
+              tax,
+              total: saleTotal,
+              amountPaid: paid,
+              changeGiven,
+              paymentMethod,
+              status: "COMPLETED",
+              storeId: store.id,
+              customerId: customerId || null,
+              cashierId: session.user.id,
+              remainingBalance: paymentMethod === "CREDIT" ? Math.max(0, saleTotal - paid) : null,
+              creditStatus: paymentMethod === "CREDIT" ? (paid >= saleTotal ? "PAID" : "UNPAID") : null,
+              items: {
+                create: items.map((item) => {
+                  const prod = products.find((p) => p.id === item.productId)!
+                  const itemTotal = item.unitPrice * item.quantity - item.discount
+                  return {
+                    productId: item.productId,
+                    productName: item.productName,
+                    barcode: item.barcode || null,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    costPrice: prod.costPrice,
+                    discount: item.discount,
+                    total: itemTotal,
+                  }
+                }),
+              },
+            },
+          })
+
+          for (const item of items) {
+            const product = await tx.product.findUnique({
+              where: { id: item.productId },
+              select: { stockQuantity: true },
+            })
+            if (!product || product.stockQuantity < item.quantity) {
+              throw new Error(`Insufficient stock for product ${item.productId}`)
+            }
+            const previousStock = product.stockQuantity
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stockQuantity: { decrement: item.quantity } },
+            })
+
+            await tx.inventoryTransaction.create({
+              data: {
+                transactionType: "OUT",
+                quantity: item.quantity,
+                previousStock,
+                newStock: previousStock - item.quantity,
+                reason: `Sale #${saleNumber}`,
+                storeId: store.id,
+                productId: item.productId,
+                createdBy: session.user.id,
+              },
+            })
+          }
+
+          if (paymentMethod === "CREDIT" && customerId) {
+            const remaining = saleTotal - paid
+            if (remaining > 0) {
+              await tx.customer.update({
+                where: { id: customerId },
+                data: {
+                  currentBalance: { increment: remaining },
+                  totalCreditSales: { increment: remaining },
+                },
+              })
+            }
+          }
+
+          return await tx.sale.findUnique({
+            where: { id: createdSale.id },
+            include: {
+              items: true,
+              customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+              cashier: { select: { id: true, name: true } },
+            },
+          })
+        })
+        break
+      } catch (error) {
+        retries--
+        if (retries <= 0) throw error
+        await new Promise((r) => setTimeout(r, 50))
+      }
+    }
 
     if (sale?.customer?.email) {
       const items = sale.items.map((i) => ({

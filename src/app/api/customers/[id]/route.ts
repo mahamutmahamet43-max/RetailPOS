@@ -20,6 +20,23 @@ export async function GET(
 
     const customer = await prisma.customer.findFirst({
       where: { id, storeId: store.id },
+      include: {
+        sales: {
+          where: { status: "COMPLETED" },
+          orderBy: { createdAt: "desc" },
+          include: {
+            items: true,
+            cashier: { select: { id: true, name: true } },
+          },
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            cashier: { select: { id: true, name: true } },
+            sale: { select: { id: true, saleNumber: true } },
+          },
+        },
+      },
     })
 
     if (!customer) {
@@ -88,6 +105,13 @@ export async function PATCH(
     if (creditLimit !== undefined && Number(creditLimit) < 0) {
       return NextResponse.json(
         { error: "Credit limit cannot be negative" },
+        { status: 400 }
+      )
+    }
+
+    if (isActive === false && existing.currentBalance > 0) {
+      return NextResponse.json(
+        { error: `Cannot deactivate customer with outstanding balance of $${existing.currentBalance.toFixed(2)}. Collect payment first.` },
         { status: 400 }
       )
     }

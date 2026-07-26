@@ -6,16 +6,14 @@ const config: CapacitorConfig = {
   webDir: "public",
   server: {
     url: "https://retailpos-sigma.vercel.app",
-    cleartext: false,
+    androidScheme: "https",
   },
   android: {
-    buildOptions: {
-      keystorePath: undefined,
-    },
     allowMixedContent: false,
   },
   plugins: {
     SplashScreen: {
+      launchAutoHide: true,
       launchShowDuration: 2000,
       backgroundColor: "#0f172a",
     },

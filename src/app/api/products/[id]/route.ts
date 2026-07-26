@@ -89,11 +89,23 @@ export async function PATCH(
       }
     }
 
-    if (sellingPrice !== undefined && Number(sellingPrice) <= 0) {
+    if (sellingPrice !== undefined && (typeof sellingPrice !== "number" || isNaN(sellingPrice) || sellingPrice <= 0)) {
       return NextResponse.json(
-        { error: "Selling price must be greater than 0" },
+        { error: "Selling price must be a positive number" },
         { status: 400 }
       )
+    }
+
+    if (costPrice !== undefined && costPrice !== null) {
+      if (typeof costPrice !== "number" || isNaN(costPrice) || costPrice < 0) {
+        return NextResponse.json({ error: "Cost price must be a non-negative number" }, { status: 400 })
+      }
+    }
+    if (stockQuantity !== undefined && (Number(stockQuantity) < 0 || !Number.isInteger(Number(stockQuantity)))) {
+      return NextResponse.json({ error: "Stock quantity must be a non-negative integer" }, { status: 400 })
+    }
+    if (minimumStock !== undefined && (Number(minimumStock) < 0 || !Number.isInteger(Number(minimumStock)))) {
+      return NextResponse.json({ error: "Minimum stock must be a non-negative integer" }, { status: 400 })
     }
 
     if (categoryId) {
@@ -126,68 +138,73 @@ export async function PATCH(
       }
     }
 
-    if (Array.isArray(productUnits)) {
-      const existingUnits = await prisma.productUnit.findMany({
-        where: { productId: id },
-      })
-      const existingIds = existingUnits.map((u) => u.id)
-      const incomingIds = productUnits.filter((u: { id?: string | null }) => u.id).map((u: { id: string }) => u.id)
-      const toDelete = existingIds.filter((eid) => !incomingIds.includes(eid))
-
-      if (toDelete.length > 0) {
-        await prisma.productUnit.deleteMany({
-          where: { id: { in: toDelete } },
+    const product = await prisma.$transaction(async (tx) => {
+      if (Array.isArray(productUnits)) {
+        const existingUnits = await tx.productUnit.findMany({
+          where: { productId: id },
         })
-      }
+        const existingIds = existingUnits.map((u) => u.id)
+        const incomingIds = productUnits.filter((u: { id?: string | null }) => u.id).map((u: { id: string }) => u.id)
+        const toDelete = existingIds.filter((eid) => !incomingIds.includes(eid))
 
-      for (const pu of productUnits) {
-        if (pu.name && String(pu.name).trim()) {
-          if (pu.id) {
-            await prisma.productUnit.update({
-              where: { id: pu.id },
-              data: {
-                name: String(pu.name).trim(),
-                conversionFactor: Number(pu.conversionFactor) || 1,
-                sellingPrice: pu.sellingPrice != null ? Number(pu.sellingPrice) : null,
-                barcode: pu.barcode || null,
-                isDefaultSaleUnit: Boolean(pu.isDefaultSaleUnit),
-              },
-            })
-          } else {
-            await prisma.productUnit.create({
-              data: {
-                productId: id,
-                name: String(pu.name).trim(),
-                conversionFactor: Number(pu.conversionFactor) || 1,
-                sellingPrice: pu.sellingPrice != null ? Number(pu.sellingPrice) : null,
-                barcode: pu.barcode || null,
-                isBaseUnit: false,
-                isDefaultSaleUnit: Boolean(pu.isDefaultSaleUnit),
-              },
-            })
+        if (toDelete.length > 0) {
+          await tx.productUnit.deleteMany({
+            where: { id: { in: toDelete } },
+          })
+        }
+
+        for (const pu of productUnits) {
+          if (pu.name && String(pu.name).trim()) {
+            if (pu.id && !existingIds.includes(pu.id)) {
+              continue
+            }
+            if (pu.id) {
+              await tx.productUnit.update({
+                where: { id: pu.id },
+                data: {
+                  name: String(pu.name).trim(),
+                  conversionFactor: Number(pu.conversionFactor) || 1,
+                  sellingPrice: pu.sellingPrice != null ? Number(pu.sellingPrice) : null,
+                  barcode: pu.barcode || null,
+                  isDefaultSaleUnit: Boolean(pu.isDefaultSaleUnit),
+                },
+              })
+            } else {
+              await tx.productUnit.create({
+                data: {
+                  productId: id,
+                  name: String(pu.name).trim(),
+                  conversionFactor: Number(pu.conversionFactor) || 1,
+                  sellingPrice: pu.sellingPrice != null ? Number(pu.sellingPrice) : null,
+                  barcode: pu.barcode || null,
+                  isBaseUnit: false,
+                  isDefaultSaleUnit: Boolean(pu.isDefaultSaleUnit),
+                },
+              })
+            }
           }
         }
       }
-    }
 
-    const product = await prisma.product.update({
-      where: { id },
-      data: {
-        ...(name !== undefined && { name: name.trim() }),
-        ...(barcode !== undefined && { barcode: barcode || null }),
-        ...(sku !== undefined && { sku: sku || null }),
-        ...(description !== undefined && { description: description || null }),
-        ...(image !== undefined && { image: image || null }),
-        ...(costPrice !== undefined && { costPrice: costPrice !== null ? Number(costPrice) : null }),
-        ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
-        ...(stockQuantity !== undefined && { stockQuantity: Number(stockQuantity) }),
-        ...(minimumStock !== undefined && { minimumStock: Number(minimumStock) }),
-        ...(brand !== undefined && { brand: brand || null }),
-        ...(unit !== undefined && { unit: unit || null }),
-        ...(isActive !== undefined && { isActive }),
-        ...(categoryId !== undefined && { categoryId }),
-      },
-      include: { category: true, productUnits: true },
+      return tx.product.update({
+        where: { id },
+        data: {
+          ...(name !== undefined && { name: name.trim() }),
+          ...(barcode !== undefined && { barcode: barcode || null }),
+          ...(sku !== undefined && { sku: sku || null }),
+          ...(description !== undefined && { description: description || null }),
+          ...(image !== undefined && { image: image || null }),
+          ...(costPrice !== undefined && { costPrice: costPrice !== null ? Number(costPrice) : null }),
+          ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
+          ...(stockQuantity !== undefined && { stockQuantity: Number(stockQuantity) }),
+          ...(minimumStock !== undefined && { minimumStock: Number(minimumStock) }),
+          ...(brand !== undefined && { brand: brand || null }),
+          ...(unit !== undefined && { unit: unit || null }),
+          ...(isActive !== undefined && { isActive }),
+          ...(categoryId !== undefined && { categoryId }),
+        },
+        include: { category: true, productUnits: true },
+      })
     })
 
     return NextResponse.json(product)

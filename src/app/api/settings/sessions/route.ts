@@ -12,7 +12,8 @@ export async function GET() {
 
     const dbSessions = await prisma.session.findMany({
       where: { userId: session.user.id },
-      orderBy: { expires: "desc" },
+      select: { id: true, expires: true, createdAt: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
     })
 
     return NextResponse.json({ sessions: dbSessions })

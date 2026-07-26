@@ -1,11 +1,13 @@
 {
-  "name": "RetailPOS",
+  "name": "RetailPOS - Point of Sale",
   "short_name": "RetailPOS",
-  "description": "Modern point of sale for your business",
+  "description": "Modern point of sale system for retail businesses",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#18181b",
+  "theme_color": "#000000",
   "orientation": "any",
   "categories": ["business", "shopping"],
   "icons": [

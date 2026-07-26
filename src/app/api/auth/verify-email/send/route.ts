@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     }
 
     if (!user?.email) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
+      return NextResponse.json({ success: true })
     }
 
     email = user.email

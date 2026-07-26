@@ -1,6 +1,8 @@
 import type { NextAuthConfig } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 
+const loginAttempts = new Map<string, { count: number; resetAt: number }>()
+
 export const authConfig: NextAuthConfig = {
   pages: {
     signIn: "/login",
@@ -42,6 +44,16 @@ export const authConfig: NextAuthConfig = {
         const email = credentials.email as string
         const password = credentials.password as string
 
+        const emailKey = email.toLowerCase().trim()
+        const attempts = loginAttempts.get(emailKey)
+        const now = Date.now()
+        if (attempts && attempts.count >= 5 && now < attempts.resetAt) {
+          throw new Error("Too many login attempts. Please try again later.")
+        }
+        if (attempts && now >= attempts.resetAt) {
+          loginAttempts.delete(emailKey)
+        }
+
         const user = await prisma.user.findUnique({
           where: { email },
         })
@@ -53,8 +65,12 @@ export const authConfig: NextAuthConfig = {
         const isValid = await bcrypt.compare(password, user.passwordHash)
 
         if (!isValid) {
+          const existing = loginAttempts.get(emailKey) || { count: 0, resetAt: now + 900000 }
+          loginAttempts.set(emailKey, { count: existing.count + 1, resetAt: existing.resetAt })
           return null
         }
+
+        loginAttempts.delete(emailKey)
 
         return {
           id: user.id,

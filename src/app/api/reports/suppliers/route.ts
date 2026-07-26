@@ -38,7 +38,10 @@ export async function GET() {
       .slice(0, 20)
 
     const totalSuppliers = suppliers.length
-    const totalSpentAll = topSuppliers.reduce((sum, s) => sum + s.totalSpent, 0)
+    const totalSpentAll = suppliers.reduce((sum, s) => {
+      const total = s.purchases.reduce((pSum, p) => pSum + p.total, 0)
+      return sum + total
+    }, 0)
 
     return NextResponse.json({
       totalSuppliers,

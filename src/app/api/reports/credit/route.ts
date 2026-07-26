@@ -23,10 +23,10 @@ export async function GET() {
       recentPayments,
     ] = await Promise.all([
       prisma.customer.count({
-        where: { storeId: store.id, currentBalance: { gt: 0 } },
+        where: { storeId: store.id, currentBalance: { gt: 0 }, isActive: true },
       }),
       prisma.customer.aggregate({
-        where: { storeId: store.id },
+        where: { storeId: store.id, currentBalance: { gt: 0 }, isActive: true },
         _sum: { currentBalance: true },
       }),
       prisma.customer.count({ where: { storeId: store.id, isActive: true } }),

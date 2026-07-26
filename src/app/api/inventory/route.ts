@@ -93,79 +93,83 @@ export async function POST(request: Request) {
 
     const { transactionType, productId, quantity, reason, notes } = validation.data
 
-    const product = await prisma.product.findFirst({
-      where: { id: productId, storeId: store.id },
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findFirst({
+        where: { id: productId, storeId: store.id },
+      })
+
+      if (!product) {
+        throw new Error("Product not found")
+      }
+
+      const previousStock = product.stockQuantity
+
+      if (transactionType === "OUT" && quantity > previousStock) {
+        throw new Error(`Stock out cannot reduce stock below zero. Current stock: ${previousStock}`)
+      }
+
+      const newQuantity =
+        transactionType === "ADJUSTMENT"
+          ? quantity
+          : transactionType === "IN"
+            ? previousStock + quantity
+            : previousStock - quantity
+
+      if (newQuantity < 0) {
+        throw new Error("New stock value must be zero or greater")
+      }
+
+      const [transaction] = await Promise.all([
+        tx.inventoryTransaction.create({
+          data: {
+            transactionType,
+            quantity: transactionType === "ADJUSTMENT" ? newQuantity : quantity,
+            previousStock,
+            newStock: newQuantity,
+            reason: reason.trim(),
+            reference: notes?.trim() || null,
+            storeId: store.id,
+            productId,
+            createdBy: authResult.userId,
+          },
+          include: {
+            product: { select: { id: true, name: true, sku: true } },
+            creator: { select: { id: true, name: true } },
+          },
+        }),
+        tx.product.update({
+          where: { id: productId },
+          data: { stockQuantity: newQuantity },
+        }),
+      ])
+
+      return { transaction, product, newQuantity }
     })
 
-    if (!product) {
-      return NextResponse.json(
-        { error: "Product not found" },
-        { status: 404 }
-      )
-    }
-
-    const previousStock = product.stockQuantity
-
-    if (transactionType === "OUT" && quantity > previousStock) {
-      return NextResponse.json(
-        { error: `Stock out cannot reduce stock below zero. Current stock: ${previousStock}` },
-        { status: 400 }
-      )
-    }
-
-    const newQuantity =
-      transactionType === "ADJUSTMENT"
-        ? quantity
-        : transactionType === "IN"
-          ? previousStock + quantity
-          : previousStock - quantity
-
-    if (newQuantity < 0) {
-      return NextResponse.json(
-        { error: "New stock value must be zero or greater" },
-        { status: 400 }
-      )
-    }
-
-    const [transaction] = await prisma.$transaction([
-      prisma.inventoryTransaction.create({
-        data: {
-          transactionType,
-          quantity: transactionType === "ADJUSTMENT" ? newQuantity : quantity,
-          previousStock,
-          newStock: newQuantity,
-          reason: reason.trim(),
-          reference: notes?.trim() || null,
-          storeId: store.id,
-          productId,
-          createdBy: authResult.userId,
-        },
-        include: {
-          product: { select: { id: true, name: true, sku: true } },
-          creator: { select: { id: true, name: true } },
-        },
-      }),
-      prisma.product.update({
-        where: { id: productId },
-        data: { stockQuantity: newQuantity },
-      }),
-    ])
+    const { transaction, product: productResult, newQuantity } = result
 
     logger.inventoryUpdated(productId, transactionType, quantity)
 
-    if (newQuantity <= product.minimumStock) {
-      // Get user info for email
+    if (newQuantity <= productResult.minimumStock) {
       const user = await prisma.user.findUnique({
         where: { id: authResult.userId },
         select: { email: true, name: true },
       })
       if (user?.email) {
-        sendLowStockEmail(user.email, user.name || "Store Owner", store.name || "Store", product.name, newQuantity, product.minimumStock).catch(() => {})
+        sendLowStockEmail(user.email, user.name || "Store Owner", store.name || "Store", productResult.name, newQuantity, productResult.minimumStock).catch(() => {})
       }
     }
 
     return NextResponse.json(transaction, { status: 201 })
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "Product not found") {
+        return NextResponse.json({ error: error.message }, { status: 404 })
+      }
+      if (error.message.startsWith("Stock out") || error.message === "New stock value must be zero or greater") {
+        return NextResponse.json({ error: error.message }, { status: 400 })
+      }
+    }
     logger.error("POST /api/inventory error", error instanceof Error ? error : undefined)
     return NextResponse.json(
       { error: "Internal server error" },

@@ -71,9 +71,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Sale not found" }, { status: 404 })
     }
 
-    if (sale.status === "VOID") {
+    if (sale.status !== "COMPLETED") {
       return NextResponse.json(
-        { error: "Sale is already voided" },
+        { error: `Cannot void a sale with status ${sale.status}` },
         { status: 400 }
       )
     }
@@ -92,29 +92,79 @@ export async function PATCH(
       })
 
       for (const item of sale.items) {
-        const product = await tx.product.findUnique({
+        const returnable = item.quantity - ((item as any).returnedQuantity || 0)
+        if (returnable <= 0) continue
+
+        const productBefore = await tx.product.findUnique({
           where: { id: item.productId },
+          select: { stockQuantity: true },
         })
 
-        if (product) {
-          const newStock = product.stockQuantity + item.quantity
+        if (!productBefore) {
+          throw new Error(`Product ${item.productId} not found — cannot restore stock for void`)
+        }
 
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stockQuantity: newStock },
+        const unitConversionFactor = (item as any).unitConversionFactor || 1
+        const baseQuantity = Math.round(returnable * unitConversionFactor)
+
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stockQuantity: { increment: baseQuantity } },
+        })
+
+        await tx.inventoryTransaction.create({
+          data: {
+            transactionType: "IN",
+            quantity: baseQuantity,
+            previousStock: productBefore.stockQuantity,
+            newStock: productBefore.stockQuantity + baseQuantity,
+            reason: `Sale ${sale.saleNumber} voided`,
+            reference: sale.saleNumber,
+            storeId: store.id,
+            productId: item.productId,
+            createdBy: authResult.userId,
+          },
+        })
+      }
+
+      if (sale.paymentMethod === "CREDIT" && sale.customerId) {
+        const totalRefunded = sale.items.reduce((sum, item) => {
+          const returned = (item as any).returnedQuantity || 0
+          return sum + (item.unitPrice || 0) * returned
+        }, 0)
+        const netTotal = sale.total - totalRefunded
+        const amountPaidOnSale = sale.amountPaid || 0
+
+        const paymentsForSale = await tx.customerPayment.findMany({
+          where: { saleId: sale.id, storeId: store.id },
+        })
+        const totalSubsequentPayments = paymentsForSale.reduce((sum, p) => sum + p.amount, 0)
+        const initialPaid = amountPaidOnSale - totalSubsequentPayments
+        const creditExtended = Math.max(0, netTotal - initialPaid)
+        const remainingDebt = Math.max(0, netTotal - amountPaidOnSale)
+
+        const customerUpdates: Record<string, any> = {}
+
+        if (remainingDebt > 0) {
+          customerUpdates.currentBalance = { decrement: remainingDebt }
+        }
+        if (creditExtended > 0) {
+          customerUpdates.totalCreditSales = { decrement: creditExtended }
+        }
+        if (totalSubsequentPayments > 0) {
+          customerUpdates.totalPaid = { decrement: totalSubsequentPayments }
+        }
+
+        if (Object.keys(customerUpdates).length > 0) {
+          await tx.customer.update({
+            where: { id: sale.customerId },
+            data: customerUpdates,
           })
+        }
 
-          await tx.inventoryTransaction.create({
-            data: {
-              transactionType: "IN",
-              quantity: item.quantity,
-              previousStock: product.stockQuantity,
-              newStock,
-              reason: `Void sale #${sale.saleNumber}`,
-              storeId: store.id,
-              productId: item.productId,
-              createdBy: authResult.userId,
-            },
+        for (const payment of paymentsForSale) {
+          await tx.customerPayment.delete({
+            where: { id: payment.id },
           })
         }
       }

@@ -96,31 +96,42 @@ export async function POST(request: Request) {
       )
     }
 
-    const lastCustomer = await prisma.customer.findFirst({
-      where: { storeId: store.id },
-      orderBy: { customerCode: "desc" },
-    })
+    let customer = null
+    let retries = 3
+    while (retries > 0) {
+      try {
+        const lastCust = await prisma.customer.findFirst({
+          where: { storeId: store.id },
+          orderBy: { customerCode: "desc" },
+          select: { customerCode: true },
+        })
+        let num = 1
+        if (lastCust?.customerCode) {
+          const parsed = parseInt(lastCust.customerCode.replace("CUST-", ""), 10)
+          if (!isNaN(parsed)) num = parsed + 1
+        }
+        const code = `CUST-${String(num).padStart(6, "0")}`
 
-    let nextNumber = 1
-    if (lastCustomer?.customerCode) {
-      const num = parseInt(lastCustomer.customerCode.replace("CUST-", ""), 10)
-      if (!isNaN(num)) nextNumber = num + 1
+        customer = await prisma.customer.create({
+          data: {
+            customerCode: code,
+            firstName: data.firstName.trim(),
+            lastName: data.lastName?.trim() || null,
+            phone: data.phone.trim(),
+            email: data.email?.trim() || null,
+            address: data.address?.trim() || null,
+            notes: data.notes?.trim() || null,
+            creditLimit: data.creditLimit,
+            storeId: store.id,
+          },
+        })
+        break
+      } catch (error) {
+        retries--
+        if (retries <= 0) throw error
+        await new Promise((r) => setTimeout(r, 50))
+      }
     }
-    const customerCode = `CUST-${String(nextNumber).padStart(6, "0")}`
-
-    const customer = await prisma.customer.create({
-      data: {
-        customerCode,
-        firstName: data.firstName.trim(),
-        lastName: data.lastName?.trim() || null,
-        phone: data.phone.trim(),
-        email: data.email?.trim() || null,
-        address: data.address?.trim() || null,
-        notes: data.notes?.trim() || null,
-        creditLimit: data.creditLimit,
-        storeId: store.id,
-      },
-    })
 
     return NextResponse.json(customer, { status: 201 })
   } catch (error) {

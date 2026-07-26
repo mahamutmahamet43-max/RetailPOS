@@ -25,11 +25,11 @@ export async function GET(
     }
 
     const payments = await prisma.customerPayment.findMany({
-      where: { customerId: id },
+      where: { customerId: id, storeId: store.id },
       orderBy: { createdAt: "desc" },
       include: {
         cashier: { select: { id: true, name: true } },
-        sale: { select: { saleNumber: true } },
+        sale: { select: { id: true, saleNumber: true } },
       },
     })
 
@@ -55,13 +55,6 @@ export async function POST(
     if (!store) return noStoreResponse()
     const { id } = await params
 
-    const customer = await prisma.customer.findFirst({
-      where: { id, storeId: store.id },
-    })
-    if (!customer) {
-      return NextResponse.json({ error: "Customer not found" }, { status: 404 })
-    }
-
     const body = await request.json()
     const validation = validateOrError(customerPaymentSchema, body)
     if (!validation.success) return validation.response
@@ -74,16 +67,20 @@ export async function POST(
       )
     }
 
-    if (amount > customer.currentBalance) {
-      return NextResponse.json(
-        { error: `Payment amount ($${amount.toFixed(2)}) exceeds outstanding balance ($${customer.currentBalance.toFixed(2)})` },
-        { status: 400 }
-      )
-    }
-
-    let updatedSale: any = null
-
     const result = await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findFirst({
+        where: { id, storeId: store.id },
+      })
+      if (!customer) {
+        throw new Error("Customer not found")
+      }
+
+      if (amount > customer.currentBalance) {
+        throw new Error(
+          `Payment amount ($${amount.toFixed(2)}) exceeds outstanding balance ($${customer.currentBalance.toFixed(2)})`
+        )
+      }
+
       const payment = await tx.customerPayment.create({
         data: {
           amount,
@@ -97,7 +94,7 @@ export async function POST(
         },
       })
 
-      const updated = await tx.customer.update({
+      await tx.customer.update({
         where: { id },
         data: {
           currentBalance: { decrement: amount },
@@ -106,29 +103,61 @@ export async function POST(
         },
       })
 
+      let updatedSale: any = null
+
       if (saleId) {
-        const sale = await tx.sale.findUnique({
-          where: { id: saleId },
-          select: { remainingBalance: true, creditStatus: true, total: true, amountPaid: true },
+        const sale = await tx.sale.findFirst({
+          where: { id: saleId, storeId: store.id },
+          select: { remainingBalance: true, creditStatus: true, total: true, amountPaid: true, customerId: true, status: true },
         })
-        if (sale && sale.remainingBalance != null) {
-          const newRemainingBalance = Math.max(0, sale.remainingBalance - amount)
-          const newCreditStatus = newRemainingBalance <= 0 ? "PAID" : "PARTIALLY_PAID"
+        if (!sale) {
+          throw new Error("Sale not found or does not belong to this store")
+        }
+        if (sale.customerId && sale.customerId !== id) {
+          throw new Error("Sale does not belong to this customer")
+        }
+        if (sale.status !== "COMPLETED") {
+          throw new Error(`Cannot record payment on a sale with status ${sale.status}`)
+        }
+        if (sale.creditStatus === "PAID") {
+          throw new Error("This sale is already fully paid")
+        }
+        if (sale.remainingBalance != null) {
+          const remaining = Math.max(0, sale.remainingBalance - amount)
           updatedSale = await tx.sale.update({
             where: { id: saleId },
             data: {
-              remainingBalance: newRemainingBalance,
-              creditStatus: newCreditStatus as any,
+              amountPaid: { increment: amount },
+              remainingBalance: remaining,
+              creditStatus: remaining <= 0 ? "PAID" : "PARTIALLY_PAID",
             },
           })
         }
       }
 
-      return payment
+      const freshCustomer = await tx.customer.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          currentBalance: true,
+          totalPaid: true,
+          totalCreditSales: true,
+          lastPaymentDate: true,
+        },
+      })
+
+      return { payment, customer: freshCustomer, updatedSale }
     })
 
-    return NextResponse.json({ payment: result, customer: updatedSale ? { ...customer, currentBalance: customer.currentBalance - amount, totalPaid: customer.totalPaid + amount } : undefined, updatedSale }, { status: 201 })
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Internal server error"
+    if (message === "Customer not found") {
+      return NextResponse.json({ error: message }, { status: 404 })
+    }
+    if (message.includes("exceeds outstanding balance") || message.includes("already fully paid") || message.includes("does not belong to this") || message.includes("Cannot record payment")) {
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
     logger.error("POST /api/customers/[id]/payments error", error instanceof Error ? error : undefined)
     return NextResponse.json(
       { error: "Internal server error" },

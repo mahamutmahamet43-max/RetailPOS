@@ -59,6 +59,18 @@ export async function PUT(request: Request) {
 
     const body = await request.json()
 
+    if (body.name && typeof body.name === "string") {
+      if (body.name.trim().length === 0 || body.name.length > 100) {
+        return NextResponse.json({ error: "Invalid store name" }, { status: 400 })
+      }
+    }
+    if (body.phone && typeof body.phone === "string" && body.phone.length > 20) {
+      return NextResponse.json({ error: "Invalid phone number" }, { status: 400 })
+    }
+    if (body.email && typeof body.email === "string" && body.email.length > 100) {
+      return NextResponse.json({ error: "Invalid email" }, { status: 400 })
+    }
+
     const store = await getCurrentStore()
 
     if (body.name) {

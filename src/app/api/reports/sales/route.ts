@@ -74,12 +74,12 @@ export async function GET(request: Request) {
     const orders = grossSales._count
     const avgOrder = orders > 0 ? net / orders : 0
 
-    const items = await prisma.saleItem.aggregate({
+    const saleItems = await prisma.saleItem.findMany({
       where: { sale: where },
-      _sum: { costPrice: true },
+      select: { costPrice: true, quantity: true, returnedQuantity: true },
     })
-    const totalCost = items._sum.costPrice || 0
-    const profit = Math.max(0, net - totalCost)
+    const totalCost = saleItems.reduce((sum, item) => sum + (item.costPrice || 0) * (item.quantity - (item.returnedQuantity || 0)), 0)
+    const profit = net - totalCost
 
     const sales = await prisma.sale.findMany({
       where,

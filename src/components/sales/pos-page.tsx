@@ -40,6 +40,8 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Receipt } from "@/components/sales/receipt"
 import { BarcodeScanner } from "@/components/products/barcode-scanner"
+import { getCachedProducts, getCachedCustomers, getCachedProductByBarcode } from "@/lib/offline-service"
+import { addPendingSale } from "@/lib/sync-engine"
 
 interface CartItem {
   productId: string
@@ -86,8 +88,23 @@ export function PosPage() {
   const [lastSale, setLastSale] = React.useState<any>(null)
   const [showReceipt, setShowReceipt] = React.useState(false)
   const [scannerOpen, setScannerOpen] = React.useState(false)
+  const [paymentReference, setPaymentReference] = React.useState("")
   const barcodeRef = React.useRef<HTMLInputElement>(null)
   const searchRef = React.useRef<HTMLInputElement>(null)
+
+  const [isOnline, setIsOnline] = React.useState(true)
+
+  React.useEffect(() => {
+    setIsOnline(navigator.onLine)
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [])
 
   const subtotal = cart.reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
@@ -97,7 +114,7 @@ export function PosPage() {
   const saleDiscount = parseFloat(discount) || 0
   const saleTax = parseFloat(tax) || 0
   const totalDiscount = cartDiscount + saleDiscount
-  const grandTotal = subtotal - saleDiscount + saleTax
+  const grandTotal = Math.max(0, subtotal - totalDiscount + saleTax)
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
   const changeGiven = Math.max(0, (parseFloat(amountPaid) || 0) - grandTotal)
 
@@ -109,7 +126,15 @@ export function PosPage() {
     fetch("/api/customers?limit=1000")
       .then((r) => r.json())
       .then((data) => setCustomers(data.customers || []))
-      .catch(() => {})
+      .catch(async () => {
+        try {
+          const cached = await getCachedCustomers()
+          setCustomers(cached.map(c => ({
+            id: c.id, firstName: c.firstName, lastName: c.lastName,
+            phone: c.phone, customerCode: (c as any).customerCode
+          })))
+        } catch {}
+      })
   }, [])
 
   async function handleBarcodeSubmit(e: React.FormEvent) {
@@ -127,7 +152,19 @@ export function PosPage() {
         }
       }
     } catch {
-      console.error("Barcode lookup failed")
+      try {
+        const cachedProduct = await getCachedProductByBarcode(barcode.trim())
+        if (cachedProduct && cachedProduct.stockQuantity > 0) {
+          addToCart({
+            id: cachedProduct.id,
+            name: cachedProduct.name,
+            barcode: cachedProduct.barcode,
+            sku: cachedProduct.sku,
+            sellingPrice: cachedProduct.sellingPrice,
+            stockQuantity: cachedProduct.stockQuantity,
+          })
+        }
+      } catch {}
     }
     setBarcode("")
     if (barcodeRef.current) barcodeRef.current.focus()
@@ -142,7 +179,15 @@ export function PosPage() {
       fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=10`)
         .then((r) => r.json())
         .then((data) => setSearchResults(data.products || []))
-        .catch(() => {})
+        .catch(async () => {
+          try {
+            const cached = await getCachedProducts(searchQuery)
+            setSearchResults(cached.map(p => ({
+              id: p.id, name: p.name, barcode: p.barcode, sku: p.sku,
+              sellingPrice: p.sellingPrice, stockQuantity: p.stockQuantity
+            })))
+          } catch {}
+        })
     }, 300)
     return () => clearTimeout(timer)
   }, [searchQuery])
@@ -158,6 +203,7 @@ export function PosPage() {
             : i
         )
       }
+      if (product.stockQuantity <= 0) return prev
       return [
         ...prev,
         {
@@ -182,8 +228,11 @@ export function PosPage() {
       if (!item) return prev
       if (newQty <= 0) return prev.filter((i) => i.productId !== productId)
       if (newQty > item.stockQuantity) newQty = item.stockQuantity
+      const maxDiscount = item.unitPrice * newQty
       return prev.map((i) =>
-        i.productId === productId ? { ...i, quantity: newQty } : i
+        i.productId === productId
+          ? { ...i, quantity: newQty, discount: Math.min(i.discount, maxDiscount) }
+          : i
       )
     })
   }
@@ -197,7 +246,10 @@ export function PosPage() {
     setDiscount("0")
     setTax("0")
     setAmountPaid("")
+    setPaymentReference("")
     setError("")
+    setSelectedCustomerId("")
+    setPaymentMethod("CASH")
   }
 
   async function handleBarcodeScanned(scannedBarcode: string) {
@@ -213,7 +265,19 @@ export function PosPage() {
         }
       }
     } catch {
-      console.error("Barcode lookup failed")
+      try {
+        const cachedProduct = await getCachedProductByBarcode(scannedBarcode)
+        if (cachedProduct && cachedProduct.stockQuantity > 0) {
+          addToCart({
+            id: cachedProduct.id,
+            name: cachedProduct.name,
+            barcode: cachedProduct.barcode,
+            sku: cachedProduct.sku,
+            sellingPrice: cachedProduct.sellingPrice,
+            stockQuantity: cachedProduct.stockQuantity,
+          })
+        }
+      } catch {}
     }
   }
 
@@ -222,19 +286,48 @@ export function PosPage() {
       setError(t("emptyCart"))
       return
     }
+    if (grandTotal < 0) {
+      setError(t("invalidDiscount") || "Discount exceeds total")
+      return
+    }
     if (paymentMethod === "CASH" && (!amountPaid || parseFloat(amountPaid) < grandTotal)) {
       setError(t("insufficientPayment"))
       return
     }
+    if (paymentMethod === "CREDIT" && !selectedCustomerId) {
+      setError(t("customerRequired") || "Customer is required for credit sales")
+      return
+    }
+    if (paymentMethod === "CREDIT") {
+      const paid = parseFloat(amountPaid) || 0
+      if (paid > grandTotal) {
+        setError(t("overpayment") || "Payment cannot exceed total for credit sales")
+        return
+      }
+    }
+    if (paymentMethod !== "CASH" && paymentMethod !== "CREDIT" && !paymentReference.trim()) {
+      setError(t("paymentReferenceRequired") || "Payment reference is required")
+      return
+    }
     setCheckingOut(true)
     setError("")
+
+    const cartBackup = [...cart]
+    const selectedCustomerBackup = selectedCustomerId
+    const discountBackup = discount
+    const taxBackup = tax
+    const amountPaidBackup = amountPaid
+    const paymentMethodBackup = paymentMethod
+    const backupGrandTotal = grandTotal
+    const saleLocalId = `pos-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    clearCart()
 
     try {
       const res = await fetch("/api/sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: cart.map((item) => ({
+          items: cartBackup.map((item) => ({
             productId: item.productId,
             productName: item.productName,
             barcode: item.barcode,
@@ -242,15 +335,22 @@ export function PosPage() {
             unitPrice: item.unitPrice,
             discount: item.discount,
           })),
-          customerId: selectedCustomerId || null,
+          customerId: selectedCustomerBackup || null,
           paymentMethod,
-          amountPaid: paymentMethod === "CASH" ? parseFloat(amountPaid) : grandTotal,
-          discount: saleDiscount,
-          tax: saleTax,
+          amountPaid: paymentMethod === "CASH" ? parseFloat(amountPaidBackup) : (parseFloat(amountPaidBackup) || (paymentMethod === "CREDIT" ? 0 : backupGrandTotal)),
+          discount: parseFloat(discountBackup) || 0,
+          tax: parseFloat(taxBackup) || 0,
+          localId: saleLocalId,
         }),
       })
 
       if (!res.ok) {
+        setCart(cartBackup)
+        setSelectedCustomerId(selectedCustomerBackup)
+        setDiscount(discountBackup)
+        setTax(taxBackup)
+        setAmountPaid(amountPaidBackup)
+        setPaymentMethod(paymentMethodBackup)
         const data = await res.json()
         setError(data.error || common("error"))
         return
@@ -258,9 +358,37 @@ export function PosPage() {
 
       const sale = await res.json()
       setLastSale(sale)
-      clearCart()
       setShowReceipt(true)
     } catch {
+      if (!navigator.onLine) {
+        const localId = `offline-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+        await addPendingSale(localId, {
+          items: cartBackup.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            barcode: item.barcode,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount,
+          })),
+          customerId: selectedCustomerBackup || null,
+          paymentMethod: paymentMethodBackup,
+          amountPaid: paymentMethodBackup === "CASH" ? parseFloat(amountPaidBackup) : (parseFloat(amountPaidBackup) || (paymentMethodBackup === "CREDIT" ? 0 : backupGrandTotal)),
+          discount: parseFloat(discountBackup) || 0,
+          tax: parseFloat(taxBackup) || 0,
+          localId: localId,
+        })
+        setError("")
+        setLastSale({ saleNumber: "OFFLINE-" + localId.slice(-6), items: cartBackup, total: backupGrandTotal, offline: true })
+        setShowReceipt(true)
+        return
+      }
+      setCart(cartBackup)
+      setSelectedCustomerId(selectedCustomerBackup)
+      setDiscount(discountBackup)
+      setTax(taxBackup)
+      setAmountPaid(amountPaidBackup)
+      setPaymentMethod(paymentMethodBackup)
       setError(common("error"))
     } finally {
       setCheckingOut(false)
@@ -422,7 +550,7 @@ export function PosPage() {
                           min="0"
                           value={item.discount}
                           onChange={(e) => {
-                            const d = parseFloat(e.target.value) || 0
+                            const d = Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.unitPrice * item.quantity))
                             setCart((prev) =>
                               prev.map((i) =>
                                 i.productId === item.productId
@@ -530,7 +658,10 @@ export function PosPage() {
               min="0"
               step="0.01"
               value={discount}
-              onChange={(e) => setDiscount(e.target.value)}
+              onChange={(e) => {
+                const val = Math.max(0, parseFloat(e.target.value) || 0)
+                setDiscount(val.toString())
+              }}
               className="h-11 lg:h-9"
             />
           </div>
@@ -542,7 +673,7 @@ export function PosPage() {
               min="0"
               step="0.01"
               value={tax}
-              onChange={(e) => setTax(e.target.value)}
+              onChange={(e) => { const val = Math.max(0, parseFloat(e.target.value) || 0); setTax(val.toString()) }}
               className="h-11 lg:h-9"
             />
           </div>
@@ -559,6 +690,7 @@ export function PosPage() {
                 <SelectItem value="EVC_PLUS">EVC Plus</SelectItem>
                 <SelectItem value="SAHAL">Sahal</SelectItem>
                 <SelectItem value="CARD">{t("card")}</SelectItem>
+                <SelectItem value="CREDIT">{t("credit") || "Credit / Deyn"}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -583,8 +715,53 @@ export function PosPage() {
             </div>
           )}
 
+          {paymentMethod === "CREDIT" && (
+            <div className="space-y-2">
+              {!selectedCustomerId && (
+                <p className="text-sm text-destructive">
+                  {t("selectCustomerForCredit") || "Select a customer before processing credit sale"}
+                </p>
+              )}
+              <Label>{t("amountPaid") || "Amount Paid Now"}</Label>
+              <Input
+                type="number"
+                min="0"
+                max={grandTotal}
+                step="0.01"
+                value={amountPaid}
+                onChange={(e) => setAmountPaid(e.target.value)}
+                placeholder="0.00"
+                className="h-11 lg:h-9"
+              />
+              {parseFloat(amountPaid) > 0 && parseFloat(amountPaid) < grandTotal && (
+                <p className="text-sm text-muted-foreground">
+                  {t("remainingBalance") || "Remaining"}: ${(grandTotal - parseFloat(amountPaid)).toFixed(2)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {paymentMethod !== "CASH" && paymentMethod !== "CREDIT" && (
+            <div className="space-y-2">
+              <Label>{t("paymentReference") || "Payment Reference"}</Label>
+              <Input
+                type="text"
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value)}
+                placeholder={t("paymentReferencePlaceholder") || "Transaction ID / Reference"}
+                className="h-11 lg:h-9"
+              />
+            </div>
+          )}
+
           {error && (
             <p className="text-sm text-destructive">{error}</p>
+          )}
+
+          {!isOnline && (
+            <p className="text-xs text-amber-600 text-center">
+              Offline — sale will sync when connected
+            </p>
           )}
 
           <Button

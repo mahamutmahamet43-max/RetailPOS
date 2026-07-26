@@ -11,8 +11,15 @@ export async function GET() {
 
     const store = await getCurrentStore()
 
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
     const totalCustomers = await prisma.customer.count({
       where: { storeId: store.id },
+    })
+
+    const newCustomers = await prisma.customer.count({
+      where: { storeId: store.id, createdAt: { gte: thirtyDaysAgo } },
     })
 
     const allCustomersWithSales = await prisma.customer.findMany({
@@ -20,7 +27,7 @@ export async function GET() {
       include: {
         sales: {
           where: { status: "COMPLETED" },
-          select: { total: true, id: true },
+          select: { total: true, amountPaid: true, id: true },
         },
       },
     })
@@ -28,7 +35,6 @@ export async function GET() {
     const customersWithOrders = allCustomersWithSales.filter(
       (c) => c.sales.length > 0
     )
-    const newCustomers = allCustomersWithSales.length
     const returningCustomers = customersWithOrders.length
 
     const topCustomers = customersWithOrders
@@ -37,7 +43,7 @@ export async function GET() {
         name: `${c.firstName} ${c.lastName || ""}`.trim(),
         phone: c.phone,
         totalOrders: c.sales.length,
-        totalSpent: c.sales.reduce((sum, s) => sum + s.total, 0),
+        totalSpent: c.sales.reduce((sum, s) => sum + (s.amountPaid || s.total), 0),
       }))
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 20)
