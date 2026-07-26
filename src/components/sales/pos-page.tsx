@@ -286,7 +286,7 @@ export function PosPage() {
       setError(t("emptyCart"))
       return
     }
-    if (grandTotal < 0) {
+    if (discount > subtotal) {
       setError(t("invalidDiscount") || "Discount exceeds total")
       return
     }
@@ -304,10 +304,6 @@ export function PosPage() {
         setError(t("overpayment") || "Payment cannot exceed total for credit sales")
         return
       }
-    }
-    if (paymentMethod !== "CASH" && paymentMethod !== "CREDIT" && !paymentReference.trim()) {
-      setError(t("paymentReferenceRequired") || "Payment reference is required")
-      return
     }
     setCheckingOut(true)
     setError("")
@@ -351,8 +347,12 @@ export function PosPage() {
         setTax(taxBackup)
         setAmountPaid(amountPaidBackup)
         setPaymentMethod(paymentMethodBackup)
-        const data = await res.json()
-        setError(data.error || common("error"))
+        try {
+          const data = await res.json()
+          setError(data.error || common("error"))
+        } catch {
+          setError(common("error"))
+        }
         return
       }
 
@@ -379,7 +379,27 @@ export function PosPage() {
           localId: localId,
         })
         setError("")
-        setLastSale({ saleNumber: "OFFLINE-" + localId.slice(-6), items: cartBackup, total: backupGrandTotal, offline: true })
+        setLastSale({
+          saleNumber: "OFFLINE-" + localId.slice(-6),
+          items: cartBackup.map((item) => ({
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount,
+            total: item.unitPrice * item.quantity - item.discount,
+          })),
+          subtotal: backupGrandTotal,
+          discount: parseFloat(discountBackup) || 0,
+          tax: parseFloat(taxBackup) || 0,
+          total: backupGrandTotal,
+          amountPaid: parseFloat(amountPaidBackup) || 0,
+          changeGiven: 0,
+          paymentMethod: paymentMethodBackup,
+          status: "COMPLETED",
+          createdAt: new Date().toISOString(),
+          cashier: { id: "offline", name: "Offline" },
+          offline: true,
+        })
         setShowReceipt(true)
         return
       }
@@ -396,10 +416,7 @@ export function PosPage() {
   }
 
   function handlePrintReceipt() {
-    setShowReceipt(false)
-    setTimeout(() => {
-      window.print()
-    }, 100)
+    window.print()
   }
 
   const storeInfo = {

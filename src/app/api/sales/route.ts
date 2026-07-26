@@ -107,6 +107,13 @@ export async function POST(request: Request) {
     )
     const saleTotal = saleSubtotal - itemDiscounts - discount + tax
 
+    if (saleTotal < 0) {
+      return NextResponse.json(
+        { error: "Sale total cannot be negative. Check discount and tax values." },
+        { status: 400 }
+      )
+    }
+
     const subscription = await getStoreSubscription(store.id)
     if (!subscription || !isSubscriptionActive(subscription)) {
       const reason = !subscription
@@ -154,6 +161,16 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { error: `Product not found: ${item.productId}` },
           { status: 404 }
+        )
+      }
+    }
+
+    for (const item of items) {
+      const product = productMap.get(item.productId)!
+      if (item.unitPrice !== product.sellingPrice) {
+        return NextResponse.json(
+          { error: `Price mismatch for "${product.name}". Expected $${product.sellingPrice.toFixed(2)}, got $${item.unitPrice.toFixed(2)}` },
+          { status: 400 }
         )
       }
     }
@@ -238,19 +255,19 @@ export async function POST(request: Request) {
     let retries = 3
     while (retries > 0) {
       try {
-        const lastSale = await prisma.sale.findFirst({
-          where: { storeId: store.id },
-          orderBy: { createdAt: "desc" },
-          select: { saleNumber: true },
-        })
-        let nextNumber = 1
-        if (lastSale?.saleNumber) {
-          const match = lastSale.saleNumber.match(/(\d+)$/)
-          if (match) nextNumber = parseInt(match[1], 10) + 1
-        }
-        const saleNumber = `SALE-${String(nextNumber).padStart(6, "0")}`
-
         sale = await prisma.$transaction(async (tx) => {
+          const lastSale = await tx.sale.findFirst({
+            where: { storeId: store.id },
+            orderBy: { createdAt: "desc" },
+            select: { saleNumber: true },
+          })
+          let nextNumber = 1
+          if (lastSale?.saleNumber) {
+            const match = lastSale.saleNumber.match(/(\d+)$/)
+            if (match) nextNumber = parseInt(match[1], 10) + 1
+          }
+          const saleNumber = `SALE-${String(nextNumber).padStart(6, "0")}`
+
           const createdSale = await tx.sale.create({
             data: {
               saleNumber,
@@ -267,10 +284,10 @@ export async function POST(request: Request) {
               customerId: customerId || null,
               cashierId: session.user.id,
               remainingBalance: paymentMethod === "CREDIT" ? Math.max(0, saleTotal - paid) : null,
-              creditStatus: paymentMethod === "CREDIT" ? (paid >= saleTotal ? "PAID" : "UNPAID") : null,
+              creditStatus: paymentMethod === "CREDIT" ? (paid >= saleTotal ? "PAID" : "PARTIALLY_PAID") : null,
               items: {
                 create: items.map((item) => {
-                  const prod = products.find((p) => p.id === item.productId)!
+                  const prod = productMap.get(item.productId)!
                   const itemTotal = item.unitPrice * item.quantity - item.discount
                   return {
                     productId: item.productId,
@@ -340,19 +357,22 @@ export async function POST(request: Request) {
         break
       } catch (error) {
         retries--
-        if (retries <= 0) throw error
+        const isP2002 = error instanceof Error && error.message.includes("P2002")
+        if (!isP2002 || retries <= 0) throw error
         await new Promise((r) => setTimeout(r, 50))
       }
     }
 
     if (sale?.customer?.email) {
-      const items = sale.items.map((i) => ({
+      const emailItems = sale.items.map((i) => ({
         name: i.productName,
         quantity: i.quantity,
         price: `$${i.unitPrice.toFixed(2)}`,
         total: `$${i.total.toFixed(2)}`,
       }))
-      sendInvoiceEmail(sale.customer.email, sale.customer.firstName, sale.saleNumber, `$${sale.total.toFixed(2)}`, items, store.name || "Store").catch(() => {})
+      sendInvoiceEmail(sale.customer.email, sale.customer.firstName, sale.saleNumber, `$${sale.total.toFixed(2)}`, emailItems, store.name || "Store").catch((err) => {
+        logger.error("Failed to send invoice email", err instanceof Error ? err : undefined)
+      })
     }
 
     return NextResponse.json(sale, { status: 201 })

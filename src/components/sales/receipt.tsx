@@ -25,7 +25,7 @@ interface ReceiptSale {
   paymentMethod: string
   createdAt: string
   status: string
-  cashier: { id: string; name: string | null }
+  cashier?: { id: string; name: string | null } | null
   customer?: { firstName: string; lastName: string | null } | null
   items: ReceiptItem[]
 }
@@ -54,6 +54,7 @@ export function Receipt({
       EVC_PLUS: "EVC Plus",
       SAHAL: "Sahal",
       CARD: t("card"),
+      CREDIT: t("credit") || "Credit",
     }
     return map[method] || method
   }
@@ -86,7 +87,7 @@ export function Receipt({
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">{t("cashierLabel")}</span>
-          <span>{sale.cashier.name || "—"}</span>
+          <span>{sale.cashier?.name || "—"}</span>
         </div>
         {sale.customer && (
           <div className="flex justify-between">

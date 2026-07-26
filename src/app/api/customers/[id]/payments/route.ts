@@ -81,9 +81,33 @@ export async function POST(
         )
       }
 
+      let targetSale: any = null
+      if (saleId) {
+        targetSale = await tx.sale.findFirst({
+          where: { id: saleId, storeId: store.id },
+          select: { remainingBalance: true, creditStatus: true, total: true, amountPaid: true, customerId: true, status: true },
+        })
+        if (!targetSale) {
+          throw new Error("Sale not found or does not belong to this store")
+        }
+        if (targetSale.customerId && targetSale.customerId !== id) {
+          throw new Error("Sale does not belong to this customer")
+        }
+        if (targetSale.status !== "COMPLETED") {
+          throw new Error(`Cannot record payment on a sale with status ${targetSale.status}`)
+        }
+        if (targetSale.creditStatus === "PAID") {
+          throw new Error("This sale is already fully paid")
+        }
+      }
+
+      const clampedPaymentAmount = targetSale?.remainingBalance != null
+        ? Math.min(amount, targetSale.remainingBalance)
+        : amount
+
       const payment = await tx.customerPayment.create({
         data: {
-          amount,
+          amount: clampedPaymentAmount,
           paymentMethod,
           reference: reference || null,
           notes: notes || null,
@@ -95,44 +119,26 @@ export async function POST(
       })
 
       await tx.customer.update({
-        where: { id },
+        where: { id, storeId: store.id },
         data: {
-          currentBalance: { decrement: amount },
-          totalPaid: { increment: amount },
+          currentBalance: { decrement: clampedPaymentAmount },
+          totalPaid: { increment: clampedPaymentAmount },
           lastPaymentDate: new Date(),
         },
       })
 
       let updatedSale: any = null
 
-      if (saleId) {
-        const sale = await tx.sale.findFirst({
-          where: { id: saleId, storeId: store.id },
-          select: { remainingBalance: true, creditStatus: true, total: true, amountPaid: true, customerId: true, status: true },
+      if (targetSale && saleId && targetSale.remainingBalance != null) {
+        const remaining = Math.max(0, targetSale.remainingBalance - clampedPaymentAmount)
+        updatedSale = await tx.sale.update({
+          where: { id: saleId },
+          data: {
+            amountPaid: { increment: clampedPaymentAmount },
+            remainingBalance: remaining,
+            creditStatus: remaining <= 0 ? "PAID" : "PARTIALLY_PAID",
+          },
         })
-        if (!sale) {
-          throw new Error("Sale not found or does not belong to this store")
-        }
-        if (sale.customerId && sale.customerId !== id) {
-          throw new Error("Sale does not belong to this customer")
-        }
-        if (sale.status !== "COMPLETED") {
-          throw new Error(`Cannot record payment on a sale with status ${sale.status}`)
-        }
-        if (sale.creditStatus === "PAID") {
-          throw new Error("This sale is already fully paid")
-        }
-        if (sale.remainingBalance != null) {
-          const remaining = Math.max(0, sale.remainingBalance - amount)
-          updatedSale = await tx.sale.update({
-            where: { id: saleId },
-            data: {
-              amountPaid: { increment: amount },
-              remainingBalance: remaining,
-              creditStatus: remaining <= 0 ? "PAID" : "PARTIALLY_PAID",
-            },
-          })
-        }
       }
 
       const freshCustomer = await tx.customer.findUnique({
